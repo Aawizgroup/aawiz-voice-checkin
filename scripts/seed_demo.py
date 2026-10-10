@@ -38,6 +38,18 @@ DATA = {
 }
 
 
+def seed(store: Store, user: str, today: date | None = None) -> int:
+    """Replace this user's data with the synthetic set. Returns the number of check-ins."""
+    today = today or date.today()
+    store.delete_user(user)
+    store.set_consent(user, scores=True, notes=True)
+    for days_ago in sorted(DATA, reverse=True):
+        mood, energy, stress, sleep = DATA[days_ago]
+        day = today - timedelta(days=days_ago)
+        store.add_checkin(user, Checkin(day, mood, energy, stress, sleep, LABEL))
+    return len(DATA)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--user", help="pseudonym to seed (default: the SIM_TOKEN's user)")
@@ -45,14 +57,7 @@ def main() -> None:
 
     settings = get_settings()
     user = args.user or settings.tokens.get(os.environ.get("SIM_TOKEN", ""), "user_demo")
-    store = Store(settings.db_path)
-    store.delete_user(user)
-    store.set_consent(user, scores=True, notes=True)
-    today = date.today()
-    for days_ago in sorted(DATA, reverse=True):
-        mood, energy, stress, sleep = DATA[days_ago]
-        day = today - timedelta(days=days_ago)
-        store.add_checkin(user, Checkin(day, mood, energy, stress, sleep, LABEL))
+    seed(Store(settings.db_path), user)
     print(
         f"SYNTHETIC demo data: {len(DATA)} check-ins over 14 days for pseudonym "
         f"'{user}' in {settings.db_path}"

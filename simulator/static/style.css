@@ -93,6 +93,12 @@ button:focus-visible { outline: 3px solid var(--listen); outline-offset: 2px; }
   .turn { max-width: 92%; font-size: 1.2rem; }
   .controls { flex-wrap: wrap; }
 }
+@media (max-width: 600px) {
+  .composer { flex: 1 1 calc(100% - 80px); }
+  .composer button { padding: 12px 14px; }
+  .voice { margin-left: auto; }
+  .top { padding: 14px 16px; }
+}
 @media (prefers-reduced-motion: reduce) {
   body[data-state] .mic .ring { animation: none; }
 }
