@@ -36,7 +36,9 @@ async def run(url: str, token: str) -> int:
 
 
 def main() -> None:
-    url = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("MCP_URL", "http://127.0.0.1:8000/mcp")
+    url = (
+        sys.argv[1] if len(sys.argv) > 1 else os.environ.get("MCP_URL", "http://127.0.0.1:8000/mcp")
+    )
     token = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("SIM_TOKEN", "")
     sys.exit(asyncio.run(run(url, token)))
 

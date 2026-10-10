@@ -7,7 +7,7 @@ import contextlib
 import json
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from mcp.server import MCPServer
@@ -35,7 +35,7 @@ INSTRUCTIONS = (
 
 def log_event(event: str, **fields) -> None:
     """One JSON line per event on stdout. Never pass note text here."""
-    line = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "event": event}
+    line = {"ts": datetime.now(UTC).isoformat(timespec="seconds"), "event": event}
     line.update(fields)
     print(json.dumps(line), file=sys.stdout, flush=True)
 

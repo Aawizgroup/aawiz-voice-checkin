@@ -97,8 +97,14 @@ class CheckinService:
     def privacy_summary(self) -> dict:
         p = policy()
         return {
-            "stored": ["date", "mood", "energy", "stress", "sleep_hours (optional)",
-                       "note (optional, only with notes consent)"],
+            "stored": [
+                "date",
+                "mood",
+                "energy",
+                "stress",
+                "sleep_hours (optional)",
+                "note (optional, only with notes consent)",
+            ],
             "retention_days": p["retention_days"],
             "speech": _clean(p["privacy_summary"]),
         }

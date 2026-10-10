@@ -12,9 +12,7 @@ SCORES = ("mood", "energy", "stress")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 MAX_WORDS = 35
 
-NOT_ENOUGH = (
-    "Not enough data yet. A few more check-ins this week and I can reflect on how it went."
-)
+NOT_ENOUGH = "Not enough data yet. A few more check-ins this week and I can reflect on how it went."
 
 
 def day_score(c: Checkin) -> int:
@@ -45,8 +43,10 @@ _PHRASES = {
 
 
 def _sentence(direction: dict[str, str], best: date, hardest: date, compared: bool) -> str:
-    opening = "Compared with last week, your check-ins suggest" if compared else (
-        "There is no earlier week to compare yet, but your check-ins suggest"
+    opening = (
+        "Compared with last week, your check-ins suggest"
+        if compared
+        else ("There is no earlier week to compare yet, but your check-ins suggest")
     )
     parts = [_PHRASES[k][direction[k]] for k in SCORES]
     body = f"{opening} {parts[0]}, {parts[1]} and {parts[2]}"

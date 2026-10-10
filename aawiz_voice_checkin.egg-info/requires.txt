@@ -1,0 +1,15 @@
+mcp==2.3.0
+mcp-types==2.3.0
+starlette==1.7.0
+uvicorn==0.54.0
+pydantic==2.14.0
+anyio==4.15.1
+httpx2==2.13.1
+
+[dev]
+pytest==9.1.1
+ruff==0.17.0
+playwright==1.63.0
+
+[llm]
+anthropic==1.13.0
