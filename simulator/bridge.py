@@ -34,7 +34,8 @@ def summarise(tool: str, ok: bool, data: dict | None) -> str:
         if not data.get("enough_data"):
             return f"{data['data_points']} check-ins, not enough yet"
         d = data["direction"]
-        return f"{data['data_points']} check-ins; mood {d['mood']}, energy {d['energy']}, stress {d['stress']}"
+        trend = f"mood {d['mood']}, energy {d['energy']}, stress {d['stress']}"
+        return f"{data['data_points']} check-ins; {trend}"
     if tool == "suggest_micro_action":
         return str(data.get("action"))
     if tool == "get_privacy_summary":

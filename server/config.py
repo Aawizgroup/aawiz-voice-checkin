@@ -50,6 +50,12 @@ class Settings:
         return self.data_dir / "checkins.sqlite3"
 
 
+def _resolve(path: str) -> Path:
+    """Relative paths are taken from the project root, not from wherever the process started."""
+    p = Path(path)
+    return p if p.is_absolute() else ROOT / p
+
+
 def get_settings() -> Settings:
     load_dotenv()
     region = os.environ.get("AAWIZ_REGION", policy()["default_region"]).upper()
@@ -57,6 +63,6 @@ def get_settings() -> Settings:
         region = policy()["default_region"]
     return Settings(
         tokens=parse_tokens(os.environ.get("AAWIZ_TOKENS", "")),
-        data_dir=Path(os.environ.get("AAWIZ_DATA_DIR", str(ROOT / "data"))),
+        data_dir=_resolve(os.environ.get("AAWIZ_DATA_DIR", "data")),
         region=region,
     )
