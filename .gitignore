@@ -13,3 +13,4 @@ playwright-report/
 *.egg-info/
 build/
 dist/
+.claude/

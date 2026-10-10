@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aawiz Voice Check-in: Alexa+ simulator</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <div>
+      <h1>Aawiz Voice Check-in</h1>
+      <p class="sub">Alexa+ simulator</p>
+    </div>
+  </div>
+  <div class="badges">
+    <span class="badge" id="brain-badge">brain: …</span>
+    <span class="badge mono" id="mcp-badge">MCP: …</span>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="talk" aria-label="Conversation">
+    <div id="captions" class="captions" aria-live="polite" aria-relevant="additions">
+      <div class="empty" id="empty">
+        <p class="empty-title">Say “Alexa, open Aawiz check-in”.</p>
+        <p>Speak with the microphone, or type. Every turn is also shown here as text.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="mic-button" class="mic" aria-pressed="false" aria-label="Start speaking">
+        <span class="ring" aria-hidden="true"></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+      </button>
+      <form id="composer" class="composer" autocomplete="off">
+        <label for="text-input" class="visually-hidden">Type what you would say</label>
+        <input id="text-input" name="text" type="text" maxlength="500" placeholder="Or type what you would say…">
+        <button id="send-button" type="submit">Send</button>
+      </form>
+      <button type="button" id="voice-toggle" class="voice" aria-pressed="true">Voice on</button>
+    </div>
+    <p class="status" id="status" role="status"></p>
+
+    <details class="try">
+      <summary>Try saying</summary>
+      <ol>
+        <li>Alexa, open Aawiz check-in.</li>
+        <li>Yes, scores and notes.</li>
+        <li>My mood is 2, energy 3, stress 4, I slept 6 hours.</li>
+        <li>How was my week?</li>
+        <li>What can I do right now?</li>
+        <li>What do you keep about me?</li>
+        <li>Delete my data.</li>
+      </ol>
+    </details>
+  </section>
+
+  <aside class="panel" aria-label="MCP activity">
+    <h2>MCP activity</h2>
+    <p class="panel-sub">Live tool calls from this simulator to the Aawiz MCP server, over Streamable HTTP.</p>
+    <ol id="mcp-log" class="log"></ol>
+    <p class="log-empty" id="log-empty">No tool calls yet.</p>
+  </aside>
+</main>
+
+<footer class="foot">
+  Not a medical service. If you are in crisis in the Netherlands, call 113 or 0800-0113, or 112 in an emergency.
+</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
