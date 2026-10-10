@@ -1,0 +1,52 @@
+[project]
+name = "aawiz-voice-checkin"
+version = "0.1.0"
+description = "A privacy-first voice check-in for Alexa+, built as a self-hosted MCP server with a web simulator."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [{ name = "AAwiz B.V." }]
+dependencies = [
+    "mcp==2.3.0",
+    "mcp-types==2.3.0",
+    "starlette==1.7.0",
+    "uvicorn==0.54.0",
+    "pydantic==2.14.0",
+    "anyio==4.15.1",
+    "httpx2==2.13.1",
+]
+
+[project.optional-dependencies]
+llm = ["anthropic==1.13.0"]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+    "playwright==1.63.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["server", "simulator"]
+
+[tool.setuptools.package-data]
+server = ["policy.json"]
+simulator = ["static/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S603", "S607", "S311"]
+"scripts/*" = ["S105", "S106", "S311", "S603", "S607"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["e2e: browser end-to-end test (needs Playwright Chromium)"]

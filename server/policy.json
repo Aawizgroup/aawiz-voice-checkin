@@ -1,0 +1,42 @@
+{
+  "_comment": "Single policy file. Banned clinical words, crisis phrases, regional resources and the curated micro-actions all live here, so reviewers can audit them in one place.",
+
+  "retention_days": 90,
+  "note_max_chars": 280,
+  "direction_threshold": 0.5,
+  "min_checkins_for_reflection": 3,
+
+  "banned_word_stems": [
+    "diagnos", "disorder", "depress", "anxiety", "burnout", "clinical",
+    "therap", "symptom", "illness", "patient", "ptsd", "bipolar",
+    "medication", "prescri", "psychiatr", "patholog"
+  ],
+
+  "crisis_phrases": [
+    "end my life", "ending my life", "kill myself", "killing myself",
+    "no reason to live", "nothing to live for", "want to die", "wanna die",
+    "take my own life", "better off dead", "don't want to live",
+    "do not want to live", "suicide", "suicidal", "hurt myself",
+    "harm myself", "self-harm", "self harm",
+    "zelfmoord", "mezelf doden", "mijn leven beëindigen", "ik wil dood",
+    "niet meer leven", "mezelf iets aandoen"
+  ],
+
+  "default_region": "NL",
+  "resources": {
+    "NL": "In the Netherlands, call 113 or 0800-0113 (free), or chat at 113.nl. In an emergency, call 112.",
+    "US": "In the US, call or text 988. In an emergency, call 911."
+  },
+  "safety_message": "I'm really glad you told me. You are not alone, and you deserve support right now. Please contact someone now. {resources}",
+
+  "micro_actions": {
+    "breathing": "Try 4-7-8 breathing: in for 4, hold for 7, and out for 8, a few rounds.",
+    "walk": "Take a short walk, even five minutes outside, and notice what is around you.",
+    "friend": "Send a short message to a friend you like talking to.",
+    "screen_break": "Take a 5-minute break from screens and let your eyes rest.",
+    "one_good_thing": "Write down one thing that went well today, however small.",
+    "water": "Drink a glass of water slowly and take a moment before the next thing."
+  },
+
+  "privacy_summary": "I keep only what you allow: the date, your mood, energy and stress scores, and with your consent, sleep hours and a short note. You are known by a pseudonym, never your name or email. I use this only to reflect on your week. Check-ins are deleted after 90 days, and you can export or delete everything anytime."
+}
