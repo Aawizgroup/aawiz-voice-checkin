@@ -91,6 +91,16 @@ async def test_weekly_reflection_speaks_the_aawiz_report(aawiz_server):
 
 
 @pytest.mark.anyio
+async def test_first_check_in_of_the_week_reads_naturally(aawiz_server, fake):
+    # Seen on production with a new account: "you checked in 1 times", streak 1.
+    fake.weekly["weekly_reflection"] = ["This week, you checked in 1 times."]
+    fake.weekly["mood_trend"] = fake.weekly["mood_trend"][:1]
+    fake.weekly["streak"]["current_streak"] = 1
+    data = await call(aawiz_server["url"], "get_weekly_reflection")
+    assert data["speech"] == "This week, you checked in once."
+
+
+@pytest.mark.anyio
 async def test_suggestion_from_elin_and_curated_fallback(aawiz_server, fake):
     data = await call(aawiz_server["url"], "suggest_micro_action")
     assert data["action"] == "elin_suggests"

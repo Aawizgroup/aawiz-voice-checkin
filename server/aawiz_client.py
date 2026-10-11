@@ -184,16 +184,25 @@ class AawizClient:
             assert self._access is not None
             return self._access
 
+    def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
+        """A read that times out is tried once more (an idle Aawiz server can be slow to wake).
+        A write is never repeated, so a check-in can't be saved twice."""
+        tries = 2 if method == "GET" else 1
+        for attempt in range(1, tries + 1):
+            headers = {"Authorization": f"Bearer {self._token()}"}
+            try:
+                return self._http.request(method, path, headers=headers, **kwargs)
+            except httpx.TimeoutException as exc:
+                if attempt == tries:
+                    raise AawizError("timeout") from exc
+            except httpx.HTTPError as exc:
+                raise AawizError("network") from exc
+        raise AawizError("timeout")  # not reached
+
     def request(self, method: str, path: str, **kwargs) -> httpx.Response:
         """One authenticated call. On a 401: refresh once, retry once."""
         for attempt in (1, 2):
-            headers = {"Authorization": f"Bearer {self._token()}"}
-            try:
-                resp = self._http.request(method, path, headers=headers, **kwargs)
-            except httpx.TimeoutException as exc:
-                raise AawizError("timeout") from exc
-            except httpx.HTTPError as exc:
-                raise AawizError("network") from exc
+            resp = self._send(method, path, **kwargs)
             if resp.status_code != 401:
                 break
             if attempt == 1:
@@ -206,6 +215,17 @@ class AawizClient:
         return resp
 
     # API -------------------------------------------------------------------
+
+    def warm_up(self) -> None:
+        """Wake Aawiz and cache the mood list in the background, so the first check-in is quick."""
+
+        def run() -> None:
+            try:
+                self.moods()
+            except AawizError:
+                pass  # the first real call reports any problem
+
+        threading.Thread(target=run, daemon=True).start()
 
     def moods(self) -> dict[str, str]:
         """Mood name -> id, fetched once."""

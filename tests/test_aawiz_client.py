@@ -7,6 +7,7 @@ import os
 import stat
 import sys
 
+import httpx2 as httpx
 import pytest
 
 from server.aawiz_client import (
@@ -123,6 +124,28 @@ def test_timeouts_become_a_calm_error(tmp_path, fake):
         client.weekly_report()
     assert not isinstance(err.value, AawizSessionEnded)
     assert "couldn't reach Aawiz" in err.value.speech
+
+
+def test_a_slow_read_is_tried_once_more_but_a_write_never(tmp_path, fake):
+    client = make_client(tmp_path, fake)
+    client.moods()
+    slow = {WEEKLY_PATH: 1, ENTRIES_PATH: 1}
+    original = fake.handle
+
+    def handle_once_slow(request):
+        path = request.url.path.lstrip("/")
+        if slow.get(path):
+            slow[path] -= 1
+            fake.requests.append((request.method, path, None))
+            raise httpx.ReadTimeout("slow", request=request)
+        return original(request)
+
+    fake.handle = handle_once_slow
+    client._http._transport = httpx.MockTransport(handle_once_slow)
+    assert client.weekly_report()["has_entries"] is True  # GET: retried
+    with pytest.raises(AawizError):
+        client.create_mood_entry("Down")  # POST: not repeated
+    assert fake.paths().count(ENTRIES_PATH) == 1
 
 
 def test_chat_timeout_is_handled(tmp_path, fake):

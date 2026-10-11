@@ -90,9 +90,11 @@ class AawizCheckinService(CheckinService):
         streak = (report.get("streak") or {}).get("current_streak", 0)
         # Drop any Aawiz sentence the guard would refuse, keep the rest.
         parts = [s for s in report.get("weekly_reflection") or [] if not banned_words_in(s)]
+        # Aawiz writes "checked in 1 times"; say it the way a person would.
+        parts = [s.replace("checked in 1 times", "checked in once") for s in parts]
         if trend != "steady":
             parts.append(f"Your mood this week is going {trend}.")
-        if streak:
+        if streak > 1:
             parts.append(f"You've checked in {streak} days in a row.")
         speech = " ".join(parts) or "You have Aawiz check-ins, but none this week yet."
         return {

@@ -7,6 +7,7 @@ server (aawiz mode, started here) over Streamable HTTP, then to the Aawiz API.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import socket
 import sys
@@ -49,9 +50,12 @@ async def call(url: str, tool: str, args: dict) -> dict:
     async with create_mcp_http_client(headers={"Authorization": f"Bearer {TOKEN}"}) as http:
         async with Client(streamable_http_client(url, http_client=http)) as client:
             result = await client.call_tool(tool, args)
-    if result.is_error or not isinstance(result.structured_content, dict):
-        raise RuntimeError(f"{tool} returned an error")
-    return result.structured_content
+    text = "".join(getattr(b, "text", "") for b in result.content)
+    if result.is_error:
+        raise RuntimeError(f"{tool} returned an error: {text[:300]}")
+    if isinstance(result.structured_content, dict):
+        return result.structured_content
+    return json.loads(text)
 
 
 def main() -> int:
@@ -107,7 +111,8 @@ def main() -> int:
         if mp3:
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(mp3)
-        detail = f"voice {tts.voice_id} = {name!r}, model {tts.model_id}"
+        shown = repr(name) if name else "name not checked (the key needs Voices: Read)"
+        detail = f"voice {tts.voice_id} = {shown}, model {tts.model_id}"
         report(bool(mp3), "text-to-speech saved data/elin_test.mp3", detail)
     return finish()
 

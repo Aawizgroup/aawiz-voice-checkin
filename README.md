@@ -179,8 +179,11 @@ make aawiz-smoke              # optional: checks every step against production
 
 `make aawiz-login` keeps only the refresh token and the session token, in
 `data/aawiz_session.json` (git-ignored, owner-only permissions), and never prints a token. Access
-tokens last 5 minutes and renew automatically 30 seconds before they expire; on a `401` the
-connector renews once and retries once. Aawiz rotates refresh tokens: each renewal replaces the
+tokens renew automatically 30 seconds before they expire (the Aawiz default lifetime is 5
+minutes; production issued 7-day access tokens when we tested on 11 October 2026). On a `401`
+the connector renews once and retries once. A read that times out is tried once more; a write
+never is, so a check-in is not saved twice. In Aawiz mode the server loads the mood list at
+startup, which also wakes an idle Aawiz server before the first check-in. Aawiz rotates refresh tokens: each renewal replaces the
 saved one. A refresh token lasts 24 hours from its last use, so a session survives as long as
 the skill is used at least once a day. If it ends, the skill says: "Your Aawiz demo session has
 ended. Please run make aawiz-login."

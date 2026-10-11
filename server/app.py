@@ -199,6 +199,7 @@ def make_service(settings: Settings, store: Store, client=None) -> CheckinServic
     if client is None:
         session_file = settings.aawiz_session_file or settings.data_dir / "aawiz_session.json"
         client = AawizClient(settings.aawiz_api_base, session_file)
+        client.warm_up()
     return AawizCheckinService(store, settings.region, client, tz=settings.timezone)
 
 
