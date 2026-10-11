@@ -45,6 +45,17 @@ to a friend. The choice is deterministic from the latest scores (high stress lea
 breathing, low energy to a walk, low mood to a friend, short sleep to a screen break, a good
 mood to one good thing, otherwise water), so it can be tested and explained.
 
+## Aawiz mode and Elin's voice
+
+The crisis check runs before any network call. On crisis language in a note, a suggestion's
+context or a message for Elin, nothing is sent to Aawiz, and the only text that may go to
+ElevenLabs is the fixed safety message. Tests assert zero requests to Aawiz in that case.
+
+Everything Aawiz sends back (the weekly reflection lines, Elin's suggestion, Elin's reply)
+passes the same banned-word guard. A reflection line or a suggestion reason that fails it is
+dropped; a suggestion title that fails it falls back to the curated list; an Elin reply that
+fails it is not spoken, and the assistant says to read it in the Aawiz app instead.
+
 ## LLM mode
 
 When the optional LLM brain is used, crisis language is still caught before anything reaches

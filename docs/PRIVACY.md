@@ -50,8 +50,27 @@ never logged.
 
 ## Third parties
 
-- **Scripted mode (default):** no third party. The simulator talks only to your MCP server, and
-  the server only to a local SQLite file.
+- **Scripted mode with typing (default):** no third party. The simulator talks only to your MCP
+  server, and the server only to a local SQLite file.
+- **Voice input:** the simulator uses the browser's Web Speech API. In Chrome, speech is sent to
+  Google to be transcribed. Typing avoids this.
 - **LLM mode (optional):** what you say, and the tool results, are sent to the Anthropic API so
   Claude can decide which tools to call. Turn this mode on only if that is acceptable.
+- **Elin's voice (optional):** the assistant's reply text, and nothing else, is sent to
+  ElevenLabs in the United States to be spoken. Your words and notes are never sent. On crisis
+  language, only the fixed safety message is spoken.
+- **Aawiz mode (optional):** check-ins (as one named mood) and the messages you send to Elin
+  are stored by Aawiz, on Microsoft Azure in the North Europe region (Ireland) according to the
+  API's public host name, under the Aawiz privacy policy. Aawiz sends chat text to its language
+  model provider to write Elin's replies. Energy, stress, sleep and notes stay in the local
+  mirror only. Crisis language is never sent to Aawiz.
+- Our server never receives or stores audio.
 - No analytics, no trackers, no advertising, no selling of data.
+
+## Aawiz mode and your rights
+
+`export_my_data` and `delete_my_data` work on the local mirror. They never touch the Aawiz
+account. The privacy summary and the delete answer say so out loud: your Aawiz account and
+everything Elin knows is managed in the Aawiz app, where you can delete your account at any
+time. The login session is kept in `data/aawiz_session.json` (git-ignored, owner-only
+permissions): a refresh token and a session token, never printed or logged.

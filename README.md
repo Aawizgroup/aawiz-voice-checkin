@@ -102,6 +102,12 @@ Copy `.env.example` to `.env`. The important settings:
 | `BRAIN_MODE` | `scripted` | `scripted` or `llm`. |
 | `ANTHROPIC_API_KEY` | | Only for `llm` mode. |
 | `LLM_MODEL` | `claude-sonnet-5-5` | Only for `llm` mode. |
+| `BACKEND_MODE` | `local` | `local` or `aawiz` (see [Aawiz mode](#aawiz-mode-the-real-product-and-elins-voice)). |
+| `AAWIZ_API_BASE` | `https://aawiz-api.azurewebsites.net/` | Only for `aawiz` mode. |
+| `AAWIZ_SESSION_FILE` | `data/aawiz_session.json` | Only for `aawiz` mode. Git-ignored. |
+| `ELEVENLABS_API_KEY` | | Optional. Elin's voice for replies. |
+| `ELEVENLABS_VOICE_ID` | `DODLEQrClDo8wCz460ld` | The Lauren B library voice. |
+| `ELEVENLABS_MODEL_ID` | `eleven_flash_v2_5` | Low-latency text-to-speech model. |
 
 For `llm` mode: `pip install -e ".[llm]"`, set `BRAIN_MODE=llm` and `ANTHROPIC_API_KEY`. If the
 key or package is missing, the simulator falls back to `scripted` and says so on the page.
@@ -122,6 +128,86 @@ key or package is missing, the simulator falls back to `scripted` and says so on
 for the pseudonym `user_demo`, each labelled "Synthetic demo data", so the weekly reflection has
 something to say in the video. No real person's data is used.
 
+## Aawiz mode: the real product and Elin's voice
+
+Everything above runs locally and is what judges can reproduce. Aawiz mode connects the same
+Alexa+ conversation to the real [Aawiz](https://www.aawiz.net) companion app and to Elin, the
+companion inside it. It needs an Aawiz account, so it is meant for the demo video, not for
+reproduction.
+
+What changes with `BACKEND_MODE=aawiz`:
+
+| Tool | Aawiz mode |
+|---|---|
+| `log_checkin` | Also saves a real Aawiz mood check-in (`POST /api/v1/mood-tracker/entries/`). Elin hears about it the way she does in the app. |
+| `get_weekly_reflection` | Speaks the real Aawiz weekly report (`GET /api/v1/mood-tracker/reports/weekly/`): its reflection lines, the mood direction this week, the streak. |
+| `suggest_micro_action` | Speaks "Elin suggests" with its reason (`GET /api/v1/companion/suggestions/today/`). If there is none today, one item from the curated list. |
+| `ask_elin` (new, eighth tool) | Sends one message to Elin through the app's chat (`POST /api/v1/chat/ticket/`, then the `ws/chat/` WebSocket) and speaks her reply. Elin remembers earlier conversations. |
+| `set_consent`, `export_my_data` | Unchanged, on the local mirror. |
+| `get_privacy_summary`, `delete_my_data` | Unchanged on the local mirror, plus: "Your Aawiz account and everything Elin knows is managed in the Aawiz app, where you can delete your account at any time." The connector never calls an account deletion endpoint. |
+
+In local mode the tool list stays exactly seven.
+
+**Score mapping.** An Aawiz check-in is one named mood; it has no energy, stress, sleep or note
+field. Our mood score picks the mood, and the rest stays only in the local mirror:
+
+| Our mood | Aawiz mood (its own score) |
+|---|---|
+| 1 | Heavy (2) |
+| 2 | Down (2) |
+| 3 | Neutral (5) |
+| 4 | Happy (8) |
+| 5 | Bright (9) |
+
+The names and scores come from the Aawiz seed migration. Anxious and Worry are never chosen, so
+the mapping never puts a worry label on someone who only said a number.
+
+**Safety stays first.** The crisis check runs before any network call. On crisis language
+nothing is sent to Aawiz, and the only thing spoken in Elin's voice is the fixed safety message.
+Everything Aawiz sends back passes the same banned-word guard; a sentence that fails it is
+dropped, and an Elin reply that fails it is not spoken (the caption says to read it in the app).
+
+**Run it.**
+
+```bash
+pip install -e ".[aawiz]"     # adds the WebSocket client for ask_elin
+# in .env: BACKEND_MODE=aawiz
+make aawiz-login              # once: demo account email, then the code from the email
+make demo
+make aawiz-smoke              # optional: checks every step against production
+```
+
+`make aawiz-login` keeps only the refresh token and the session token, in
+`data/aawiz_session.json` (git-ignored, owner-only permissions), and never prints a token. Access
+tokens last 5 minutes and renew automatically 30 seconds before they expire; on a `401` the
+connector renews once and retries once. Aawiz rotates refresh tokens: each renewal replaces the
+saved one. A refresh token lasts 24 hours from its last use, so a session survives as long as
+the skill is used at least once a day. If it ends, the skill says: "Your Aawiz demo session has
+ended. Please run make aawiz-login."
+
+### Elin's voice
+
+With `ELEVENLABS_API_KEY` in `.env`, every assistant reply is spoken in Elin's voice: the
+ElevenLabs library voice "Lauren B, Friendly & Comforting Voice for AI Companion & Assistants"
+(`ELEVENLABS_VOICE_ID`, a public library voice, not a clone of a real person) with the
+low-latency `eleven_flash_v2_5` model. The simulator turns only the reply text into audio, on
+the server; your words and notes are never sent. Without a key, or if a call fails, the page
+uses the browser's voice and the header says "Voice: browser". This works in either backend
+mode.
+
+## What we built during the hackathon
+
+Aawiz (the companion app, its API and Elin) existed before the hackathon. Everything in this
+repository is new, written during the submission period. Dates are commit dates from the git
+history:
+
+| Date (2026) | What |
+|---|---|
+| 10 October | The MCP server with seven tools, bearer auth, retention purge, and its tests |
+| 10 October | The Alexa+ simulator: voice page, captions, MCP activity panel, scripted and LLM brains |
+| 11 October | End-to-end browser test, docs, `make verify`, Docker and CI |
+| 11 October | Aawiz mode: the connector to the real Aawiz API, the `ask_elin` tool, and Elin's voice |
+
 ## Privacy by design
 
 - **Consent first, in two scopes.** Nothing is stored without `scores` consent. Notes are never
@@ -134,8 +220,12 @@ something to say in the video. No real person's data is used.
 - **Retention.** Check-ins older than 90 days are deleted at startup and once a day.
 - **No analytics, no trackers, no selling.** Logs record the tool name, the pseudonym and the
   time, never the note text.
-- **Where data goes.** In `scripted` mode, nothing leaves your machine except calls to your own
-  MCP server. In `llm` mode, what you say is sent to the Anthropic API so Claude can choose tools.
+- **Where data goes.** In `scripted` mode with typing, nothing leaves your machine except calls
+  to your own MCP server. Voice input in Chrome is sent to Google to be transcribed; typing
+  avoids this. In `llm` mode, what you say is sent to the Anthropic API so Claude can choose
+  tools. With Elin's voice, the assistant's reply text is sent to ElevenLabs (United States). In
+  Aawiz mode, check-ins and Elin conversations are stored by Aawiz. Our server never receives or
+  stores audio.
 
 More in [docs/PRIVACY.md](docs/PRIVACY.md).
 
@@ -190,8 +280,18 @@ answers `401` and the Inspector offers an OAuth sign-in, which this server does 
 
 - It runs as a self-hosted MCP server plus a web simulator of the Alexa+ conversation. It is
   not a published Alexa skill.
-- Voice input uses the browser's Web Speech API, which works in Chrome and Edge. Typing works
-  in every browser.
+- Voice input uses the browser's Web Speech API, which works in Chrome and Edge. In Chrome,
+  speech is sent to Google to be transcribed. Typing works in every browser and avoids this.
+- Elin's voice sends the assistant's reply text to ElevenLabs in the United States.
+- Aawiz mode needs an Aawiz account and a one-time email-code login, so judges cannot reproduce
+  it; the local mode is the reproducible version. It stores check-ins and Elin conversations in
+  Aawiz, on Microsoft Azure in the North Europe region (Ireland) according to the API's public
+  host name, under the Aawiz privacy policy. Aawiz sends chat text to its language model provider
+  to write Elin's replies.
+- In Aawiz mode, energy, stress, sleep and notes stay only in the local mirror, because an
+  Aawiz check-in has no field for them. `delete_my_data` deletes the local mirror only; the Aawiz
+  account is deleted in the Aawiz app.
+- Aawiz allows 10 mood check-ins per hour per account.
 - The scripted brain understands the demo phrasings and close variants, not open conversation.
   The `llm` brain handles free speech but needs an Anthropic API key.
 - Crisis detection is a phrase list in English and Dutch. It will miss indirect wording, which
