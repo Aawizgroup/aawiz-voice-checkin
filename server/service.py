@@ -113,7 +113,8 @@ class CheckinService:
     def export(self, user: str) -> dict:
         data = self.store.export(user)
         n = len(data["checkins"])
-        return {"data": data, "speech": f"Here is everything I keep about you: {n} check-ins."}
+        noun = "check-in" if n == 1 else "check-ins"
+        return {"data": data, "speech": f"Here is everything I keep about you: {n} {noun}."}
 
     # 7 ------------------------------------------------------------------
     def delete(self, user: str) -> dict:
