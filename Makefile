@@ -2,7 +2,7 @@
 VENV_BIN := $(if $(wildcard .venv/bin/python),.venv/bin/,)
 PY := $(VENV_BIN)python
 
-.PHONY: install run-server run-sim seed test lint verify demo
+.PHONY: install run-server run-sim seed test lint verify demo aawiz-login aawiz-smoke
 
 .env:
 	cp .env.example .env
@@ -36,3 +36,11 @@ verify:
 demo: seed
 	@echo "Open http://127.0.0.1:8001 in Chrome. Ctrl+C stops both."
 	@trap 'kill 0' INT TERM EXIT; $(PY) -m server & sleep 2; $(PY) -m simulator
+
+# Aawiz mode (needs BACKEND_MODE=aawiz in .env). Log in once with the demo account's email code.
+aawiz-login: .env
+	$(PY) scripts/aawiz_login.py
+
+# Against production with the demo session. Not run in CI.
+aawiz-smoke: .env
+	$(PY) scripts/aawiz_smoke.py

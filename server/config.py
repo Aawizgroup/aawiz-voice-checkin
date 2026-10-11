@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 POLICY_PATH = Path(__file__).resolve().parent / "policy.json"
+DEFAULT_AAWIZ_API_BASE = "https://aawiz-api.azurewebsites.net/"
 
 
 def load_dotenv(path: Path = ROOT / ".env") -> None:
@@ -44,6 +45,10 @@ class Settings:
     tokens: dict[str, str]
     data_dir: Path
     region: str
+    backend_mode: str = "local"  # "local" (default) or "aawiz"
+    aawiz_api_base: str = DEFAULT_AAWIZ_API_BASE
+    aawiz_session_file: Path | None = None
+    timezone: str = "Europe/Amsterdam"
 
     @property
     def db_path(self) -> Path:
@@ -61,8 +66,15 @@ def get_settings() -> Settings:
     region = os.environ.get("AAWIZ_REGION", policy()["default_region"]).upper()
     if region not in policy()["resources"]:
         region = policy()["default_region"]
+    mode = os.environ.get("BACKEND_MODE", "local").strip().lower()
     return Settings(
         tokens=parse_tokens(os.environ.get("AAWIZ_TOKENS", "")),
         data_dir=_resolve(os.environ.get("AAWIZ_DATA_DIR", "data")),
         region=region,
+        backend_mode=mode if mode in ("local", "aawiz") else "local",
+        aawiz_api_base=os.environ.get("AAWIZ_API_BASE", DEFAULT_AAWIZ_API_BASE),
+        aawiz_session_file=_resolve(
+            os.environ.get("AAWIZ_SESSION_FILE", "data/aawiz_session.json")
+        ),
+        timezone=os.environ.get("AAWIZ_TZ", "Europe/Amsterdam"),
     )

@@ -166,19 +166,49 @@ def build_mcp(settings: Settings, service: CheckinService, base_url: str) -> MCP
         user = _user()
         return done("delete_my_data", user, service.delete(user))
 
+    if hasattr(service, "ask_elin"):  # aawiz mode only; local mode keeps exactly seven tools
+
+        @mcp.tool(
+            description="Say one thing to Elin, the companion in the Aawiz app, and hear her "
+            "reply. Elin remembers earlier conversations and check-ins. Not for emergencies.",
+        )
+        def ask_elin(
+            message: Annotated[
+                str, Field(min_length=1, max_length=500, description="What to tell Elin.")
+            ],
+        ) -> dict:
+            user = _user()
+            return done("ask_elin", user, service.ask_elin(user, message))
+
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_: Request) -> JSONResponse:
+        if settings.backend_mode == "aawiz":
+            return JSONResponse({"status": "ok", "backend": "aawiz"})
         return JSONResponse({"status": "ok"})
 
     return mcp
 
 
+def make_service(settings: Settings, store: Store, client=None) -> CheckinService:
+    """Local mode: the SQLite service. Aawiz mode: the same tools backed by the Aawiz API."""
+    if settings.backend_mode != "aawiz":
+        return CheckinService(store, settings.region)
+    from server.aawiz_client import AawizClient
+    from server.aawiz_service import AawizCheckinService
+
+    if client is None:
+        session_file = settings.aawiz_session_file or settings.data_dir / "aawiz_session.json"
+        client = AawizClient(settings.aawiz_api_base, session_file)
+        client.warm_up()
+    return AawizCheckinService(store, settings.region, client, tz=settings.timezone)
+
+
 def create_app(
-    settings: Settings | None = None, host: str = "127.0.0.1", port: int = 8000
+    settings: Settings | None = None, host: str = "127.0.0.1", port: int = 8000, client=None
 ) -> Starlette:
     settings = settings or get_settings()
     store = Store(settings.db_path)
-    service = CheckinService(store, settings.region)
+    service = make_service(settings, store, client)
     mcp = build_mcp(settings, service, f"http://{host}:{port}")
     app = mcp.streamable_http_app(host=host)
     retention = policy()["retention_days"]
@@ -207,4 +237,5 @@ def create_app(
 
     app.router.lifespan_context = lifespan
     app.state.store = store
+    app.state.service = service
     return app

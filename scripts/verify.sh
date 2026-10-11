@@ -33,7 +33,8 @@ grep -E "passed|failed" "$LOG" | tail -n 1 | sed 's/^/      /'
 PORT=${VERIFY_PORT:-8765}
 TOKEN="verify-$RANDOM$RANDOM"
 DATA="data/verify-$$"
-AAWIZ_TOKENS="$TOKEN:user_verify" AAWIZ_DATA_DIR="$DATA" "$PY" -m server --port "$PORT" \
+BACKEND_MODE=local AAWIZ_TOKENS="$TOKEN:user_verify" AAWIZ_DATA_DIR="$DATA" \
+  "$PY" -m server --port "$PORT" \
   >"$LOG.server" 2>&1 &
 SERVER=$!
 for _ in $(seq 1 40); do

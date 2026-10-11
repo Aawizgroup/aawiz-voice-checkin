@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import socket
 import threading
 import time
@@ -16,6 +17,11 @@ from server.app import create_app
 from server.config import Settings
 
 TOKENS = {"token-a": "user_a", "token-b": "user_b"}
+
+# Tests never take these from the developer's .env: no real ElevenLabs calls, and local mode
+# unless BACKEND_MODE=aawiz is exported on purpose (for the production end-to-end test).
+os.environ.setdefault("ELEVENLABS_API_KEY", "")
+os.environ.setdefault("BACKEND_MODE", "local")
 
 
 def free_port() -> int:
