@@ -20,6 +20,10 @@
 
   let voiceOn = true;
   let busy = false;
+  let player = null; // Elin's voice, when the simulator has it
+  const voiceBadge = $("#voice-badge");
+
+  function setVoiceLabel(name) { voiceBadge.textContent = "Voice: " + name; }
 
   function setState(s) { document.body.dataset.state = s; }
 
@@ -61,6 +65,32 @@
     log.appendChild(li);
   }
 
+  function stopSpeaking() {
+    if (player) { player.pause(); player = null; }
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }
+
+  // Elin's voice from the simulator; on any failure, the browser's own voice.
+  function speakReply(text, audioUrl) {
+    if (!voiceOn) { setState("idle"); return; }
+    if (!audioUrl) { speak(text); return; }
+    stopSpeaking();
+    const a = new Audio(audioUrl);
+    player = a;
+    let fellBack = false;
+    const fallback = () => {
+      if (fellBack || player !== a) return;
+      fellBack = true;
+      player = null;
+      setVoiceLabel("browser");
+      speak(text);
+    };
+    a.onplaying = () => setState("speaking");
+    a.onended = () => { if (player === a) player = null; setState("idle"); };
+    a.onerror = fallback;
+    a.play().catch(fallback);
+  }
+
   function speak(text) {
     if (!voiceOn || !("speechSynthesis" in window)) { setState("idle"); return; }
     window.speechSynthesis.cancel();
@@ -90,7 +120,7 @@
       (data.tools || []).forEach(addTool);
       const reply = data.reply || "Sorry, could you say that again?";
       addTurn("assistant", reply, data.safety);
-      speak(reply);
+      speakReply(reply, data.audio);
     } catch (e) {
       addTurn("assistant", "Sorry, I couldn't reach the simulator.");
       setState("idle");
@@ -109,7 +139,7 @@
     voiceOn = !voiceOn;
     voiceToggle.setAttribute("aria-pressed", String(voiceOn));
     voiceToggle.textContent = voiceOn ? "Voice on" : "Voice off";
-    if (!voiceOn && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    if (!voiceOn) stopSpeaking();
   });
 
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -142,7 +172,7 @@
     rec.onerror = (e) => { status.textContent = "Microphone: " + e.error + ". Typing still works."; };
     mic.addEventListener("click", () => {
       if (listening) { rec.stop(); return; }
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      stopSpeaking();
       try { rec.start(); } catch (e) { /* already started */ }
     });
   }
@@ -151,6 +181,7 @@
     $("#brain-badge").textContent = "brain: " + c.brain + (c.model ? " (" + c.model + ")" : "");
     $("#mcp-badge").textContent = "MCP: " + c.mcp_url;
     if (c.note) status.textContent = c.note;
+    setVoiceLabel(c.voice === "elin" ? "Elin" : "browser");
   }).catch(() => {});
 
   setState("idle");

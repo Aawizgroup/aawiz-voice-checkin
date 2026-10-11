@@ -25,6 +25,8 @@ def summarise(tool: str, ok: bool, data: dict | None) -> str:
         return "rejected"
     if data.get("safety"):
         return "safety message"
+    if data.get("summary"):  # aawiz mode results describe themselves
+        return str(data["summary"])
     if tool == "set_consent":
         on = {True: "on", False: "off"}
         return f"scores {on[data['scores']]}, notes {on[data['notes']]}"

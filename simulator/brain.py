@@ -17,6 +17,10 @@ WORDS = {
 
 YES = re.compile(r"\b(yes|yeah|yep|sure|ok|okay|both|agree|go ahead|please do|do it)\b")
 NO = re.compile(r"\b(no|nope|don't|do not|nothing|neither)\b")
+ELIN = re.compile(
+    r"^(?:(?:please\s+)?(?:ask|tell|say to)\s+elin|(?:hey\s+|hi\s+)?elin)\b[\s,:!.]*(.*)$",
+    re.IGNORECASE | re.DOTALL,
+)
 SCORES_ONLY = re.compile(
     r"(scores? only|only (the )?scores?|no notes|not (the )?notes|without notes)"
 )
@@ -79,9 +83,10 @@ def strip_wake(text: str) -> str:
 class ScriptedBrain:
     mode = "scripted"
 
-    def __init__(self, bridge: McpBridge, region: str = "NL"):
+    def __init__(self, bridge: McpBridge, region: str = "NL", elin: bool = False):
         self.bridge = bridge
         self.region = region
+        self.elin = elin  # ask_elin exists only in aawiz mode
 
     async def handle(self, text: str, state: SessionState) -> Turn:
         raw = strip_wake(text)
@@ -105,6 +110,14 @@ class ScriptedBrain:
             return Turn(
                 "Sure. May I store your daily scores and short notes? Say yes, scores only, or no."
             )
+        elin = ELIN.match(raw)
+        if elin:
+            if not self.elin:
+                return Turn("Talking to Elin works when the skill runs in Aawiz mode.")
+            message = elin.group(1).strip()
+            if not message:
+                return Turn("What would you like to tell Elin?")
+            return await self._call("ask_elin", {"message": message[:500]})
         if any(re.search(rf"\b{k}\b", t) for k in ("mood", "energy", "stress")):
             return await self._checkin(raw, state)
         if re.search(r"\b(delete|erase|remove|wipe)\b.*\b(data|everything|me)\b|forget me", t):
