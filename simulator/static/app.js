@@ -118,6 +118,8 @@
       });
       const data = await res.json();
       (data.tools || []).forEach(addTool);
+      if (data.brain) $("#brain-badge").textContent = data.brain;
+      if (data.note) status.textContent = data.note;
       const reply = data.reply || "Sorry, could you say that again?";
       addTurn("assistant", reply, data.safety);
       speakReply(reply, data.audio);
@@ -178,7 +180,12 @@
   }
 
   fetch("/api/config").then((r) => r.json()).then((c) => {
-    $("#brain-badge").textContent = "brain: " + c.brain + (c.model ? " (" + c.model + ")" : "");
+    $("#brain-badge").textContent = c.label || "brain: " + c.brain + (c.model ? " (" + c.model + ")" : "");
+    if (c.demo) {
+      const notice = $("#demo-notice");
+      notice.textContent = c.demo;
+      notice.hidden = false;
+    }
     $("#mcp-badge").textContent = "MCP: " + c.mcp_url;
     if (c.note) status.textContent = c.note;
     setVoiceLabel(c.voice === "elin" ? "Elin" : "browser");

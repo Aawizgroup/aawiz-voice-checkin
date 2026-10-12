@@ -65,6 +65,8 @@ body[data-state="speaking"] .mic .ring { border-color: var(--navy); opacity: .55
 .voice[aria-pressed="false"] { color: var(--muted); }
 button:focus-visible { outline: 3px solid var(--listen); outline-offset: 2px; }
 .status { min-height: 1.3em; margin: 0; color: var(--muted); font-size: .9rem; }
+.demo-notice { margin: 0; font-size: .9rem; font-weight: 600; }
+.demo-notice[hidden] { display: none; }
 .mic-note { margin: 0; color: var(--muted); font-size: .8rem; }
 
 .try { color: var(--muted); font-size: .95rem; }

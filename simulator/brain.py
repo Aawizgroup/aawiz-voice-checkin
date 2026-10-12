@@ -47,6 +47,7 @@ class Turn:
     reply: str
     tools: list[ToolCall] = field(default_factory=list)
     safety: bool = False
+    brain: str = ""  # header label for this turn; set only by the nebius brain
 
 
 def _number(token: str) -> float:
