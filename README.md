@@ -2,6 +2,8 @@
 
 Demo video (under 3 minutes): https://youtu.be/agGxav0tBmY
 
+Friction log for the hackathon: [docs/FRICTION_LOG.md](docs/FRICTION_LOG.md)
+
 A 30-second daily check-in for Alexa+: say how your mood, energy and stress are, and hear back
 how your week is going, one small thing to try right now, and exactly what is kept about you.
 
