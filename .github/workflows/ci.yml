@@ -40,3 +40,20 @@ jobs:
           done
           docker logs avc
           exit 1
+      - name: Build the hosted demo image
+        run: docker build -f deploy/Dockerfile.demo -t aawiz-demo .
+      - name: Run the hosted demo on the platform's PORT, without a key
+        run: |
+          docker run -d --name demo -e PORT=10000 -p 10000:10000 aawiz-demo
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:10000/health; then
+              curl -fsS http://127.0.0.1:10000/api/config | tee config.json
+              grep -q '"demo"' config.json
+              curl -fsS -X POST http://127.0.0.1:10000/api/turn                 -H 'Content-Type: application/json'                 -d '{"session":"ci-visitor-0123456789","text":"How was my week?"}' | tee turn.json
+              grep -q 'get_weekly_reflection' turn.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs demo
+          exit 1

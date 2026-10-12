@@ -1,4 +1,6 @@
-# Dockerfile for the Hugging Face Space that hosts the public demo.
+# Dockerfile for a Hugging Face Docker Space. Note: on 13 October 2026 Hugging Face required a
+# paid plan for Docker Spaces, so the public demo is hosted elsewhere with deploy/Dockerfile.demo.
+# This file is kept for anyone who has such a plan.
 # Copy this file and README.md from this folder into the Space. Nothing else is needed there:
 # the app is installed from the public GitHub branch below.
 #

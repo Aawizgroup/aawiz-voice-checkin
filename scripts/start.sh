@@ -6,6 +6,11 @@
 # Otherwise: the local demo, seeded with synthetic data for the one demo user.
 set -e
 
+# Hosting platforms (Render and others) say which port to listen on through PORT.
+if [ -n "$PORT" ]; then
+  export SIM_PORT="$PORT"
+fi
+
 if [ "$DEMO_PUBLIC" = "true" ]; then
   TOKEN=$(python -c "import secrets; print(secrets.token_hex(24))")
   export AAWIZ_TOKENS="$TOKEN:demo" SIM_TOKEN="$TOKEN"

@@ -56,9 +56,12 @@ make nebius-smoke     # optional: lists the NVIDIA models, runs two turns, print
 
 **Hosted demo.** The public demo runs with `DEMO_PUBLIC=true`: synthetic data only, a random
 pseudonym per visitor with an invented 14-day history, everything deleted after two hours, at
-most 20 Nebius turns per visitor per hour and 300 per day. Files for a Hugging Face Docker
-Space are in [`deploy/huggingface`](deploy/huggingface). Link: to be added once the Space is
-live.
+most 20 Nebius turns per visitor per hour and 300 per day. It is one container, built from
+[`deploy/Dockerfile.demo`](deploy/Dockerfile.demo), that listens on the host's `PORT`; the only
+setting it needs is the secret `NEBIUS_API_KEY`. Link: to be added once it is live.
+
+The demo is hosted on a free instance that goes to sleep after 15 minutes without visitors. If
+it has been idle, the first load takes about a minute while it wakes up; after that it is fast.
 
 **Built during the Nebius submission period** (commit dates on this branch):
 

@@ -1,0 +1,33 @@
+# The hosted public demo (for example on a free Render web service).
+# Build from the repository root:  docker build -f deploy/Dockerfile.demo -t aawiz-demo .
+#
+# The only thing to set on the host is the secret NEBIUS_API_KEY. Without it the demo still
+# runs, on the scripted brain. The platform's PORT variable is honoured (Render sets 10000).
+FROM python:3.12-slim
+
+RUN useradd --create-home --uid 1000 app
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEMO_PUBLIC=true \
+    BRAIN_MODE=nebius \
+    NEBIUS_MODEL=nvidia/Nemotron-3_5-Lightning \
+    BACKEND_MODE=local \
+    AAWIZ_REGION=NL \
+    AAWIZ_HOST=127.0.0.1 \
+    AAWIZ_PORT=8000 \
+    MCP_URL=http://127.0.0.1:8000/mcp \
+    AAWIZ_DATA_DIR=/app/data \
+    SIM_HOST=0.0.0.0 \
+    SIM_PORT=10000
+
+COPY pyproject.toml README.md LICENSE ./
+COPY server ./server
+COPY simulator ./simulator
+COPY scripts ./scripts
+RUN pip install --no-cache-dir -e ".[nebius]" \
+ && mkdir -p /app/data && chown app /app/data
+USER app
+
+EXPOSE 10000
+CMD ["sh", "scripts/start.sh"]
