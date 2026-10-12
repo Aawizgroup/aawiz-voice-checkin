@@ -49,10 +49,15 @@ class Settings:
     aawiz_api_base: str = DEFAULT_AAWIZ_API_BASE
     aawiz_session_file: Path | None = None
     timezone: str = "Europe/Amsterdam"
+    demo_public: bool = False  # hosted demo: per-visitor synthetic users, local backend only
 
     @property
     def db_path(self) -> Path:
         return self.data_dir / "checkins.sqlite3"
+
+
+def env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _resolve(path: str) -> Path:
@@ -67,6 +72,9 @@ def get_settings() -> Settings:
     if region not in policy()["resources"]:
         region = policy()["default_region"]
     mode = os.environ.get("BACKEND_MODE", "local").strip().lower()
+    demo = env_flag("DEMO_PUBLIC")
+    if demo:
+        mode = "local"  # the public demo never talks to Aawiz
     return Settings(
         tokens=parse_tokens(os.environ.get("AAWIZ_TOKENS", "")),
         data_dir=_resolve(os.environ.get("AAWIZ_DATA_DIR", "data")),
@@ -77,4 +85,5 @@ def get_settings() -> Settings:
             os.environ.get("AAWIZ_SESSION_FILE", "data/aawiz_session.json")
         ),
         timezone=os.environ.get("AAWIZ_TZ", "Europe/Amsterdam"),
+        demo_public=demo,
     )

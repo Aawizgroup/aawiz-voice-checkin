@@ -149,6 +149,15 @@ class Store:
             n += c.execute("DELETE FROM consent WHERE user_id = ?", (user_id,)).rowcount
         return n
 
+    def delete_prefix(self, prefix: str) -> int:
+        """Delete every user whose id starts with `prefix` (the public demo's visitors)."""
+        where = "WHERE substr(user_id, 1, ?) = ?"
+        args = (len(prefix), prefix)
+        with self._conn() as c:
+            n = c.execute(f"DELETE FROM checkins {where}", args).rowcount  # noqa: S608
+            n += c.execute(f"DELETE FROM consent {where}", args).rowcount  # noqa: S608
+        return n
+
     def purge_older_than(self, days: int, today: date | None = None) -> int:
         cutoff = (today or date.today()) - timedelta(days=days)
         with self._conn() as c:

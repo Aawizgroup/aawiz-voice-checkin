@@ -21,10 +21,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from server.config import Settings, get_settings, policy
+from server.demo import DemoTokenVerifier, DemoUsers
 from server.service import CheckinService
 from server.storage import Store
 
 DAY_SECONDS = 24 * 60 * 60
+DEMO_SWEEP_SECONDS = 5 * 60
 
 INSTRUCTIONS = (
     "Aawiz Voice Check-in helps a person notice early signs of stress and lower energy "
@@ -60,13 +62,15 @@ def _user() -> str:
     return tok.client_id
 
 
-def build_mcp(settings: Settings, service: CheckinService, base_url: str) -> MCPServer:
+def build_mcp(
+    settings: Settings, service: CheckinService, base_url: str, verifier=None
+) -> MCPServer:
     mcp = MCPServer(
         "aawiz-voice-checkin",
         title="Aawiz Voice Check-in",
         instructions=INSTRUCTIONS,
         version="0.1.0",
-        token_verifier=StaticTokenVerifier(settings.tokens),
+        token_verifier=verifier or StaticTokenVerifier(settings.tokens),
         auth=AuthSettings(
             issuer_url=base_url,
             resource_server_url=f"{base_url}/mcp",
@@ -209,7 +213,9 @@ def create_app(
     settings = settings or get_settings()
     store = Store(settings.db_path)
     service = make_service(settings, store, client)
-    mcp = build_mcp(settings, service, f"http://{host}:{port}")
+    demo_users = DemoUsers(store) if settings.demo_public else None
+    verifier = DemoTokenVerifier(settings.tokens, demo_users) if demo_users else None
+    mcp = build_mcp(settings, service, f"http://{host}:{port}", verifier)
     app = mcp.streamable_http_app(host=host)
     retention = policy()["retention_days"]
 
@@ -221,21 +227,32 @@ def create_app(
             await asyncio.sleep(DAY_SECONDS)
             purge()
 
+    async def demo_sweep() -> None:  # public demo: visitors' rows live two hours
+        while True:
+            await asyncio.sleep(DEMO_SWEEP_SECONDS)
+            removed = demo_users.purge_expired()
+            if removed:
+                log_event("demo_purge", users=removed)
+
     inner = app.router.lifespan_context
 
     @asynccontextmanager
     async def lifespan(a: Starlette):
         purge()  # at startup, then once a day
-        task = asyncio.create_task(daily())
+        tasks = [asyncio.create_task(daily())]
+        if demo_users:
+            tasks.append(asyncio.create_task(demo_sweep()))
         try:
             async with inner(a) as state:
                 yield state
         finally:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+            for task in tasks:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
 
     app.router.lifespan_context = lifespan
     app.state.store = store
     app.state.service = service
+    app.state.demo_users = demo_users
     return app

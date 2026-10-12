@@ -12,42 +12,10 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import date, timedelta
 
 from server.config import get_settings
-from server.storage import Checkin, Store
-
-LABEL = "Synthetic demo data"
-
-# days ago -> (mood, energy, stress, sleep hours)
-DATA = {
-    14: (4, 4, 2, 7.5),
-    13: (4, 3, 2, 7.0),
-    12: (3, 4, 3, 7.0),
-    11: (4, 4, 2, 8.0),
-    10: (4, 3, 3, 7.0),
-    9: (3, 4, 2, 7.5),
-    8: (4, 4, 2, 8.0),
-    7: (4, 3, 2, 7.0),
-    6: (3, 3, 3, 7.0),
-    5: (3, 2, 4, 6.0),
-    4: (2, 2, 4, 5.5),
-    3: (4, 3, 2, 7.5),
-    2: (3, 2, 4, 6.0),
-    1: (2, 3, 4, 6.0),
-}
-
-
-def seed(store: Store, user: str, today: date | None = None) -> int:
-    """Replace this user's data with the synthetic set. Returns the number of check-ins."""
-    today = today or date.today()
-    store.delete_user(user)
-    store.set_consent(user, scores=True, notes=True)
-    for days_ago in sorted(DATA, reverse=True):
-        mood, energy, stress, sleep = DATA[days_ago]
-        day = today - timedelta(days=days_ago)
-        store.add_checkin(user, Checkin(day, mood, energy, stress, sleep, LABEL))
-    return len(DATA)
+from server.demo import DATA, LABEL, seed  # noqa: F401  (re-exported for tests and tools)
+from server.storage import Store
 
 
 def main() -> None:
