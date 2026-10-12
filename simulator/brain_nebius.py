@@ -17,20 +17,37 @@ brain for that turn.
 from __future__ import annotations
 
 import json
+import re
 
 import openai
 
 from server.safety import banned_words_in, contains_crisis, safety_message
-from simulator.brain import ScriptedBrain, SessionState, Turn, strip_wake
+from simulator.brain import (
+    DELETE_CONFIRM,
+    NO,
+    SCORES_ONLY,
+    YES,
+    ScriptedBrain,
+    SessionState,
+    Turn,
+    strip_wake,
+)
 from simulator.bridge import McpBridge, ToolCall
 
 BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
 TIMEOUT = 15.0
 MAX_TOOL_CALLS = 4  # per turn; a fifth is refused
 MAX_REQUESTS = 6  # model round trips per turn
-MAX_TOKENS = 400
+MAX_TOKENS = 2048  # Nemotron reasons before it answers; 400 was all spent on reasoning
 HISTORY_MESSAGES = 24
 FALLBACK_LABEL = "Brain: scripted (fallback)"
+CONSENT_REFUSAL = json.dumps(
+    {
+        "error": "not allowed: consent must come from the person, in their own words. If they "
+        "already agreed earlier, go on and call log_checkin; it will say if consent is missing."
+    }
+)
+CONSENT_WORDS = re.compile(r"\b(store|storing|keep|keeping|save|saving|consent|record)\b")
 LIMIT_REFUSAL = json.dumps(
     {"error": "tool call limit reached for this turn; answer with what you already have"}
 )
@@ -44,10 +61,17 @@ How to talk:
 
 What to do:
 - Use the tools for everything about the person's check-ins. Never invent scores or history.
-- Before logging a check-in, make sure the person has given consent with set_consent. If they \
-have not, ask whether you may keep their scores and short notes.
+- When the person asks about their week, what they can do now, or what is kept about them, \
+call the matching tool every time, even if you answered before. Never answer those from memory.
+- When the person gives their scores, call log_checkin straight away. The tool checks \
+consent itself, so do not check or set consent first.
+- If log_checkin says consent is missing, ask whether you may keep their scores and short \
+notes. After they answer, call set_consent with their answer, then log the check-in again.
+- Consent comes only from the person. Never call set_consent unless they have just answered \
+that question or asked to change their consent.
 - Ask again if a score is missing or out of range.
-- Before delete_my_data, ask the person to confirm, and call it only after a clear yes.
+- When the person asks to delete their data, call delete_my_data. The app asks them to \
+confirm before anything is deleted.
 
 Boundaries:
 - You are not a medical service. You never diagnose, never name a condition and never give \
@@ -64,6 +88,42 @@ def make_client(api_key: str, http_client=None) -> openai.AsyncOpenAI:
         max_retries=0,  # one try, then the scripted brain answers
         http_client=http_client,
     )
+
+
+def _confirmed(raw: str, state: SessionState) -> bool:
+    """True when the person just said yes to a delete question the assistant asked."""
+    t = raw.lower()
+    if not YES.search(t) or NO.search(t):
+        return False
+    last = next((m for m in reversed(state.history) if m.get("role") == "assistant"), None)
+    return bool(last and "delet" in str(last.get("content", "")).lower())
+
+
+def _consent_said(raw: str, state: SessionState) -> tuple[bool, bool] | None:
+    """(scores, notes) the person just agreed to, or None when they said nothing about consent.
+
+    Counts only when the person answers a question the assistant asked about storing, or
+    talks about storing themselves. What they said decides the values, not the model.
+    """
+    t = raw.lower()
+    last = next((m for m in reversed(state.history) if m.get("role") == "assistant"), None)
+    asked = bool(last and CONSENT_WORDS.search(str(last.get("content", "")).lower()))
+    # A short answer such as "yes, scores and notes" also counts; a check-in sentence does not.
+    scores, notes = re.search(r"\bscores?\b", t), re.search(r"\bnotes?\b", t)
+    short_answer = (
+        len(t.split()) <= 8
+        and re.match(r"\W*(yes|yeah|yep|sure|ok|okay|no|nope)\b", t)
+        and (scores or notes)
+    )
+    if not (asked or CONSENT_WORDS.search(t) or SCORES_ONLY.search(t) or short_answer):
+        return None
+    if SCORES_ONLY.search(t):
+        return True, False
+    if NO.search(t) and not YES.search(t):
+        return False, False
+    if YES.search(t) or re.search(r"\b(you (may|can)|allow|agree)\b", t):
+        return True, not (scores and not notes)  # naming only scores grants only scores
+    return None
 
 
 def _trim(history: list) -> list:
@@ -129,6 +189,17 @@ class NebiusBrain:
             state.awaiting = None
             return Turn(safety_message(self.region), safety=True)
 
+        # Deleting is confirmed in code, never left to the model: a yes deletes, anything else
+        # keeps the data. No request goes to Nebius for this answer.
+        if state.awaiting == "delete":
+            turn = await self.scripted._delete_answer(raw.lower(), state)
+            turn.brain = self.label
+            state.history += [
+                {"role": "user", "content": raw},
+                {"role": "assistant", "content": turn.reply},
+            ]
+            return turn
+
         messages = [*_trim(state.history), {"role": "user", "content": raw}]
         calls: list[ToolCall] = []
         reply = ""
@@ -157,7 +228,15 @@ class NebiusBrain:
                     }
                 )
                 for tc in tool_calls:
-                    content = await self._run_tool(tc, calls)
+                    if tc.function.name == "delete_my_data" and not _confirmed(raw, state):
+                        # The model may ask for it, but only the person's yes runs it.
+                        state.awaiting = "delete"
+                        state.history += [
+                            {"role": "user", "content": raw},
+                            {"role": "assistant", "content": DELETE_CONFIRM},
+                        ]
+                        return Turn(DELETE_CONFIRM, calls, brain=self.label)
+                    content = await self._run_tool(tc, calls, raw, state)
                     messages.append(
                         {
                             "role": "tool",
@@ -171,14 +250,16 @@ class NebiusBrain:
             return await self._fallback(text, state, calls)
 
         if not reply or banned_words_in(reply):
-            # The guard refused the model's words: the scripted answer for this turn instead.
-            return await self._fallback(text, state, calls, label=self.label)
+            # No usable words from the model (empty, or refused by the guard): the scripted
+            # answer for this turn instead.
+            return await self._fallback(text, state, calls)
 
         state.history[:] = [*messages, {"role": "assistant", "content": reply}]
+        state.awaiting = None  # the model led this turn; drop any stale scripted question
         safety = any(c.data and c.data.get("safety") for c in calls)
         return Turn(reply, calls, safety=safety, brain=self.label)
 
-    async def _run_tool(self, tc, calls: list[ToolCall]) -> str:
+    async def _run_tool(self, tc, calls: list[ToolCall], raw: str, state: SessionState) -> str:
         if len(calls) >= MAX_TOOL_CALLS:
             return LIMIT_REFUSAL
         try:
@@ -187,25 +268,32 @@ class NebiusBrain:
                 raise ValueError("arguments must be an object")
         except ValueError:
             return json.dumps({"error": "arguments were not valid JSON"})
+        if tc.function.name == "set_consent":
+            # Consent is the person's to give. The model may only pass on what they just said.
+            said = _consent_said(raw, state)
+            if said is None:
+                return CONSENT_REFUSAL
+            args = {"scores": said[0], "notes": said[1]}
         call = await self.bridge.call(tc.function.name, args)
         calls.append(call)
         return call.text or "{}"
 
-    async def _fallback(
-        self, text: str, state: SessionState, calls: list[ToolCall], label: str = FALLBACK_LABEL
-    ) -> Turn:
+    async def _fallback(self, text: str, state: SessionState, calls: list[ToolCall]) -> Turn:
         """The scripted brain's answer for this turn.
 
-        If tools already ran this turn, their own spoken line is that answer; running the
-        scripted brain again would repeat the side effect (for example log a check-in twice).
+        If the model already ran tools this turn, their own spoken line is that answer: running
+        the scripted brain again would repeat the side effect (for example log a check-in
+        twice). The model chose those tools, so the label stays Nebius. Otherwise the scripted
+        brain handles the whole turn and the label says so.
         """
         speech = next(
             (c.data["speech"] for c in reversed(calls) if c.data and c.data.get("speech")), ""
         )
         if speech:
             safety = any(c.data and c.data.get("safety") for c in calls)
-            return Turn(speech, calls, safety=safety, brain=label)
+            state.awaiting = None
+            return Turn(speech, calls, safety=safety, brain=self.label)
         turn = await self.scripted.handle(text, state)
         turn.tools = [*calls, *turn.tools]
-        turn.brain = label
+        turn.brain = FALLBACK_LABEL
         return turn

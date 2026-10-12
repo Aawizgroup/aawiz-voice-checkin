@@ -1,5 +1,79 @@
 # Aawiz Voice Check-in
 
+## Nebius x NVIDIA: Personal AI
+
+This branch (`feature/nebius-personal-ai`) adds an agent brain that runs on **Nebius Token
+Factory** with an **NVIDIA open model**, `nvidia/Nemotron-3_5-Lightning`.
+
+**What the Nebius brain does.** You talk to the check-in assistant in your own words. On every
+turn the simulator makes a runtime call to the Nebius Token Factory inference API
+(`https://api.tokenfactory.nebius.com/v1/`, the OpenAI-compatible chat completions endpoint).
+Nemotron receives the seven tools of our MCP server as function definitions, built from the
+server's live `tools/list`, and decides which to call. Each call then goes through a real MCP
+client over Streamable HTTP, so the "MCP activity" panel shows what the model did. The header
+shows `Brain: Nebius · nvidia/Nemotron-3_5-Lightning`.
+
+**Why it fits Personal AI.**
+
+- **Memory** is the person's own check-in history: dates, three scores, optional sleep and
+  note. The model never invents it; it reads it through tools.
+- **Skills** are the MCP tools: log a check-in, reflect on the week, suggest one small action,
+  explain privacy, export, delete.
+- **The data is under the person's control**, enforced in code, not left to the model:
+  - Consent: `set_consent` runs only when the person has just answered the consent question, and
+    what they said decides the values ("scores only" stores no notes). The model cannot grant
+    consent on its own. `log_checkin` refuses on the server when consent is missing.
+  - Delete: the model may ask for `delete_my_data`, but it runs only after the person says
+    yes to a delete question.
+  - Export: everything kept about the person, as JSON, by asking.
+
+**Guardrails around the model.**
+
+- The crisis check runs before any call to Nebius. On crisis language no request is sent and
+  only the fixed safety message is shown.
+- Every reply passes the banned-word guard. If it fails, or the model returns no words, the
+  scripted brain answers that turn instead.
+- At most 4 tool calls per turn, a 15-second timeout, no retries. On any Nebius error the
+  scripted brain answers that turn and the header says `Brain: scripted (fallback)`.
+- The system prompt says the assistant is not a medical service, never diagnoses, and only
+  describes patterns in the person's own check-ins.
+
+**The model.** Token Factory listed four NVIDIA models on 13 October 2026, all with tool
+support: Nemotron 3 Nano (30B), Nemotron 3.5 Lightning (30B), Nemotron 3 Super (120B) and
+Nemotron 3 Ultra (550B). The two smallest are the same size and price. We ran the same
+eight-turn conversation through each: Lightning called the right tool on every turn in about
+7 seconds for the whole conversation; Nano needed about 58 seconds. So we chose
+`nvidia/Nemotron-3_5-Lightning`.
+
+**Run it.**
+
+```bash
+pip install -e ".[nebius]"
+# in .env: BRAIN_MODE=nebius, NEBIUS_API_KEY=<your key>, NEBIUS_MODEL=nvidia/Nemotron-3_5-Lightning
+make demo
+make nebius-smoke     # optional: lists the NVIDIA models, runs two turns, prints tokens used
+```
+
+**Hosted demo.** The public demo runs with `DEMO_PUBLIC=true`: synthetic data only, a random
+pseudonym per visitor with an invented 14-day history, everything deleted after two hours, at
+most 20 Nebius turns per visitor per hour and 300 per day. Files for a Hugging Face Docker
+Space are in [`deploy/huggingface`](deploy/huggingface). Link: to be added once the Space is
+live.
+
+**Built during the Nebius submission period** (commit dates on this branch):
+
+| Date (2026) | What |
+|---|---|
+| 12 October | Public demo mode: per-visitor synthetic users, two-hour purge, cost caps |
+| 12 October | The Nebius brain: MCP tools as functions, crisis gate, guard, fallbacks, limits |
+| 12 October | Mocked-Nebius tests, `make nebius-smoke`, Hugging Face Space files |
+| 13 October | Model choice from live runs; consent and delete enforced in code |
+
+The MCP server, the simulator and Aawiz mode below were built from 10 to 12 October 2026 for
+the Amazon App Dev Hackathon and are the base this branch builds on.
+
+---
+
 Demo video (under 3 minutes): https://youtu.be/agGxav0tBmY
 
 Friction log for the hackathon: [docs/FRICTION_LOG.md](docs/FRICTION_LOG.md)
@@ -103,7 +177,10 @@ Copy `.env.example` to `.env`. The important settings:
 | `SIM_TOKEN` | | The token the simulator uses to call the server. |
 | `AAWIZ_REGION` | `NL` | Region for crisis resources (`NL` or `US`). |
 | `AAWIZ_DATA_DIR` | `./data` | Folder for the SQLite file (git-ignored). |
-| `BRAIN_MODE` | `scripted` | `scripted` or `llm`. |
+| `BRAIN_MODE` | `scripted` | `scripted`, `llm` or `nebius`. |
+| `NEBIUS_API_KEY` | | Only for `nebius` mode. Secret. |
+| `NEBIUS_MODEL` | `nvidia/Nemotron-3_5-Lightning` | Only for `nebius` mode. |
+| `DEMO_PUBLIC` | `false` | `true` for the hosted public demo. |
 | `ANTHROPIC_API_KEY` | | Only for `llm` mode. |
 | `LLM_MODEL` | `claude-sonnet-5-5` | Only for `llm` mode. |
 | `BACKEND_MODE` | `local` | `local` or `aawiz` (see [Aawiz mode](#aawiz-mode-the-real-product-and-elins-voice)). |

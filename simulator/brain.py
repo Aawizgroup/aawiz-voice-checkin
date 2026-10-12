@@ -30,6 +30,10 @@ GREETING = (
     "and short notes? Say yes, scores only, or no."
 )
 ASK_SCORES = " How are you today? Tell me your mood, energy and stress, each from 1 to 5."
+DELETE_CONFIRM = (
+    "This removes all your check-ins and consent records, and it cannot be "
+    "undone. Should I delete everything? Say yes or no."
+)
 HELP = (
     "You can tell me your mood, energy and stress from 1 to 5, ask how your week was, "
     "ask what you can do right now, or ask what I keep about you."
@@ -123,10 +127,7 @@ class ScriptedBrain:
             return await self._checkin(raw, state)
         if re.search(r"\b(delete|erase|remove|wipe)\b.*\b(data|everything|me)\b|forget me", t):
             state.awaiting = "delete"
-            return Turn(
-                "This removes all your check-ins and consent records, and it cannot be "
-                "undone. Should I delete everything? Say yes or no."
-            )
+            return Turn(DELETE_CONFIRM)
         if re.search(r"how (was|is|has been) my week|\bmy week\b|\bweekly\b|\breflect", t):
             return await self._call("get_weekly_reflection", {})
         if re.search(r"what can i do|\bsuggest|right now|something to do|what should i do", t):

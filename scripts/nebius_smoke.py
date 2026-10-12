@@ -103,7 +103,10 @@ class LocalMcp:
 async def probe(key: str, model_id: str, mcp: LocalMcp) -> tuple[bool, str, int]:
     """One live check: does this model call get_weekly_reflection and then answer in words?"""
     brain = NebiusBrain(McpBridge(mcp.url, TOKEN), "NL", model_id, make_client(key))
-    turn = await brain.handle("How was my week?", SessionState())
+    try:
+        turn = await brain.handle("How was my week?", SessionState())
+    finally:
+        await brain.client.close()
     tools = [c.tool for c in turn.tools]
     ok = tools == ["get_weekly_reflection"] and turn.brain == brain.label and bool(turn.reply)
     return ok, f"tools={tools} label={turn.brain!r} reply={turn.reply[:120]!r}", brain.tokens_used
@@ -111,6 +114,13 @@ async def probe(key: str, model_id: str, mcp: LocalMcp) -> tuple[bool, str, int]
 
 async def smoke(key: str, model_id: str, mcp: LocalMcp) -> int:
     brain = NebiusBrain(McpBridge(mcp.url, TOKEN), "NL", model_id, make_client(key))
+    try:
+        return await _smoke_turns(brain, mcp)
+    finally:
+        await brain.client.close()
+
+
+async def _smoke_turns(brain: NebiusBrain, mcp: LocalMcp) -> int:
     state = SessionState()
 
     turn = await brain.handle("My mood is 2, energy 3, stress 4, I slept 6 hours.", state)
@@ -184,4 +194,6 @@ def finish(tokens: int) -> int:
 
 if __name__ == "__main__":
     os.chdir(ROOT)
+    for stream in (sys.stdout, sys.stderr):  # model replies may hold characters cp1252 lacks
+        stream.reconfigure(encoding="utf-8", errors="replace")
     raise SystemExit(main())

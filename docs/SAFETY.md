@@ -56,6 +56,14 @@ passes the same banned-word guard. A reflection line or a suggestion reason that
 dropped; a suggestion title that fails it falls back to the curated list; an Elin reply that
 fails it is not spoken, and the assistant says to read it in the Aawiz app instead.
 
+## Nebius mode
+
+Crisis language is caught before any request to Nebius; tests assert zero requests. The
+model's reply passes the banned-word guard, and a reply that fails it is replaced by the
+scripted brain's answer. Consent and deletion are enforced in code: the model cannot grant
+consent for the person, and `delete_my_data` runs only after the person says yes to a delete
+question. Tool calls are limited to four per turn.
+
 ## LLM mode
 
 When the optional LLM brain is used, crisis language is still caught before anything reaches
