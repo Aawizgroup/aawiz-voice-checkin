@@ -2,7 +2,7 @@
 VENV_BIN := $(if $(wildcard .venv/bin/python),.venv/bin/,)
 PY := $(VENV_BIN)python
 
-.PHONY: install run-server run-sim seed test lint verify demo aawiz-login aawiz-smoke
+.PHONY: install run-server run-sim seed test lint verify demo aawiz-login aawiz-smoke nebius-smoke
 
 .env:
 	cp .env.example .env
@@ -44,3 +44,8 @@ aawiz-login: .env
 # Against production with the demo session. Not run in CI.
 aawiz-smoke: .env
 	$(PY) scripts/aawiz_smoke.py
+
+# Nebius brain: lists the NVIDIA models and runs two turns through NEBIUS_MODEL with your key.
+# Not run in CI.
+nebius-smoke: .env
+	$(PY) scripts/nebius_smoke.py

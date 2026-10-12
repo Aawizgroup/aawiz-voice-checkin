@@ -22,6 +22,8 @@ TOKENS = {"token-a": "user_a", "token-b": "user_b"}
 # unless BACKEND_MODE=aawiz is exported on purpose (for the production end-to-end test).
 os.environ.setdefault("ELEVENLABS_API_KEY", "")
 os.environ.setdefault("BACKEND_MODE", "local")
+os.environ.setdefault("NEBIUS_API_KEY", "")  # tests never call Nebius
+os.environ.setdefault("DEMO_PUBLIC", "")
 
 
 def free_port() -> int:

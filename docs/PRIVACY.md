@@ -56,6 +56,14 @@ never logged.
   Google to be transcribed. Typing avoids this.
 - **LLM mode (optional):** what you say, and the tool results, are sent to the Anthropic API so
   Claude can decide which tools to call. Turn this mode on only if that is acceptable.
+- **Nebius mode (optional):** your message and the tool results (for example your scores and
+  the weekly reflection) are sent to Nebius Token Factory, where an NVIDIA open model generates
+  the reply and decides which tools to call. Crisis language is caught first and is never sent.
+  Recent turns of the conversation are sent along so the model has context.
+- **Public demo (`DEMO_PUBLIC=true`):** synthetic data only. Each visitor gets a random
+  pseudonym with an invented 14-day history; everything that pseudonym holds is deleted after
+  two hours and nothing survives a restart. No Aawiz account and no ElevenLabs are involved.
+  The page asks visitors not to enter real personal information.
 - **Elin's voice (optional):** the assistant's reply text, and nothing else, is sent to
   ElevenLabs in the United States to be spoken. Your words and notes are never sent. On crisis
   language, only the fixed safety message is spoken.
