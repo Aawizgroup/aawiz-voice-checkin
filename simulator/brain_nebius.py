@@ -10,8 +10,10 @@ endpoint https://api.tokenfactory.nebius.com/v1/ with the official `openai` pack
 `{"role": "tool", "tool_call_id", "name", "content"}`.
 
 Order in every turn: crisis check first (no request to Nebius on crisis language), then the
-model, then the banned-word guard on its reply. Any Nebius error falls back to the scripted
-brain for that turn.
+model, then the banned-word guard on its reply. Three things are decided in code and never by
+the model: consent (only the person's words grant it), deleting (only the person's yes runs
+it) and the scores of a check-in (only numbers the person said in their current message).
+Any Nebius error falls back to the scripted brain for that turn.
 """
 
 from __future__ import annotations
@@ -24,12 +26,17 @@ import openai
 from server.safety import banned_words_in, contains_crisis, safety_message
 from simulator.brain import (
     DELETE_CONFIRM,
+    GREETING,
     NO,
+    NUM,
     SCORES_ONLY,
     YES,
     ScriptedBrain,
     SessionState,
     Turn,
+    _number,
+    _whole,
+    parse_checkin,
     strip_wake,
 )
 from simulator.bridge import McpBridge, ToolCall
@@ -48,6 +55,13 @@ CONSENT_REFUSAL = json.dumps(
     }
 )
 CONSENT_WORDS = re.compile(r"\b(store|storing|keep|keeping|save|saving|consent|record)\b")
+SCORE_KEYS = ("mood", "energy", "stress")
+# "I'd like to do my check-in", "open Aawiz check-in", "let's check in": a wish to start.
+CHECKIN_INTENT = re.compile(
+    r"\b(do|start|open|begin|launch|log|record|make|have)\b.{0,30}\bcheck[\s-]?in\b"
+    r"|\b(want|like|ready|time|let'?s|let us)\b.{0,12}\bcheck[\s-]?in\b"
+    r"|\b(open|start|launch|begin)\b.{0,20}\baawiz\b"
+)
 LIMIT_REFUSAL = json.dumps(
     {"error": "tool call limit reached for this turn; answer with what you already have"}
 )
@@ -65,6 +79,8 @@ What to do:
 call the matching tool every time, even if you answered before. Never answer those from memory.
 - When the person gives their scores, call log_checkin straight away. The tool checks \
 consent itself, so do not check or set consent first.
+- Call log_checkin only when the person's latest message contains their mood, energy and \
+stress. The app takes the numbers from their words, not from you. If any is missing, ask for it.
 - If log_checkin says consent is missing, ask whether you may keep their scores and short \
 notes. After they answer, call set_consent with their answer, then log the check-in again.
 - Consent comes only from the person. Never call set_consent unless they have just answered \
@@ -124,6 +140,38 @@ def _consent_said(raw: str, state: SessionState) -> tuple[bool, bool] | None:
     if YES.search(t) or re.search(r"\b(you (may|can)|allow|agree)\b", t):
         return True, not (scores and not notes)  # naming only scores grants only scores
     return None
+
+
+def _last_assistant(state: SessionState) -> str:
+    last = next((m for m in reversed(state.history) if m.get("role") == "assistant"), None)
+    return str(last.get("content", "")).lower() if last else ""
+
+
+def _scores_said(raw: str, state: SessionState) -> dict:
+    """The check-in the person stated in this message: scores, sleep and note, nothing else.
+
+    Scores are read next to their names ("mood 2, energy 3, stress 4"). Three bare numbers
+    ("2, 3 and 4") count as mood, energy, stress only as the answer to a question that asked
+    for exactly those. Whatever is missing here is missing: the model's numbers are not used.
+    """
+    said = parse_checkin(raw)
+    if not any(k in said for k in SCORE_KEYS):
+        asked = _last_assistant(state)
+        numbers = re.findall(rf"\b{NUM}\b", raw.lower())
+        if len(numbers) == 3 and all(k in asked for k in SCORE_KEYS):
+            said.update({k: _whole(_number(n)) for k, n in zip(SCORE_KEYS, numbers, strict=True)})
+    return said
+
+
+def _checkin_refusal(missing: list[str]) -> str:
+    return json.dumps(
+        {
+            "stored": False,
+            "error": "not allowed: scores must come from the person's latest message, and it "
+            f"has no {' or '.join(missing)}. Nothing was stored. Ask the person to say their "
+            "mood, energy and stress together, each from 1 to 5.",
+        }
+    )
 
 
 def _trim(history: list) -> list:
@@ -200,6 +248,21 @@ class NebiusBrain:
             ]
             return turn
 
+        # Consent before scores, like the scripted brain: someone who asks to check in and has
+        # not been asked in this session gets the consent question first, written in code.
+        if (
+            not state.consent_asked
+            and CHECKIN_INTENT.search(raw.lower())
+            and not all(k in parse_checkin(raw) for k in SCORE_KEYS)
+        ):
+            state.consent_asked = True
+            state.awaiting = "consent"  # so a fallback turn reads the answer correctly
+            state.history += [
+                {"role": "user", "content": raw},
+                {"role": "assistant", "content": GREETING},
+            ]
+            return Turn(GREETING, brain=self.label)
+
         messages = [*_trim(state.history), {"role": "user", "content": raw}]
         calls: list[ToolCall] = []
         reply = ""
@@ -274,6 +337,17 @@ class NebiusBrain:
             if said is None:
                 return CONSENT_REFUSAL
             args = {"scores": said[0], "notes": said[1]}
+            state.consent_asked = True
+        if tc.function.name == "log_checkin":
+            # The scores are the person's: only numbers from their current message are logged.
+            said_now = _scores_said(raw, state)
+            missing = [k for k in SCORE_KEYS if k not in said_now]
+            if missing:
+                return _checkin_refusal(missing)
+            note = said_now.get("note") or str(args.get("note") or "").strip()
+            if note and note.lower() in raw.lower():  # a note is kept only in their own words
+                said_now["note"] = note[:280]
+            args = said_now
         call = await self.bridge.call(tc.function.name, args)
         calls.append(call)
         return call.text or "{}"

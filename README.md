@@ -25,7 +25,11 @@ shows `Brain: Nebius · nvidia/Nemotron-3_5-Lightning`.
 - **The data is under the person's control**, enforced in code, not left to the model:
   - Consent: `set_consent` runs only when the person has just answered the consent question, and
     what they said decides the values ("scores only" stores no notes). The model cannot grant
-    consent on its own. `log_checkin` refuses on the server when consent is missing.
+    consent on its own. `log_checkin` refuses on the server when consent is missing. Someone
+    who asks to check in is asked for consent before any score.
+  - Scores: `log_checkin` runs only with the mood, energy and stress read from the person's
+    current message. Numbers proposed by the model are never stored; if one is missing,
+    nothing is stored and the model asks for it.
   - Delete: the model may ask for `delete_my_data`, but it runs only after the person says
     yes to a delete question.
   - Export: everything kept about the person, as JSON, by asking.

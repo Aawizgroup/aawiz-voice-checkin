@@ -44,6 +44,7 @@ HELP = (
 class SessionState:
     awaiting: str | None = None  # "consent" | "delete" | None
     history: list = field(default_factory=list)  # used by the llm brain
+    consent_asked: bool = False  # the nebius brain asked for consent in this session
 
 
 @dataclass

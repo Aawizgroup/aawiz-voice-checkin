@@ -133,10 +133,10 @@ def test_an_empty_reply_is_answered_by_the_scripted_brain(stack):
 
 
 def test_a_nebius_turn_clears_a_stale_scripted_question(stack):
-    # Turn 1 falls back and the scripted brain asks for consent; turn 2 is handled by the
-    # model; turn 3 falls back again and must not be read as an answer to the consent question.
+    # Turn 1 asks for consent in code; turn 2 is handled by the model; turn 3 falls back and
+    # must not be read as an answer to the consent question.
     args = {"scores": True, "notes": True}
-    fake = FakeNebius(500, [tool_call("set_consent", args)], "Got it, I will keep them.", 500)
+    fake = FakeNebius([tool_call("set_consent", args)], "Got it, I will keep them.", 500)
     http = stack["start"](fake)
     assert "may I store" in turn(http, "Alexa, open Aawiz check-in.")["reply"]
     assert turn(http, "Yes, scores and notes.")["brain"] == NEBIUS_LABEL
@@ -170,10 +170,10 @@ def test_the_fifth_tool_call_in_one_turn_is_refused(stack):
 
 
 def test_conversation_history_is_kept_between_turns(stack):
-    fake = FakeNebius("Hello. May I keep your scores and short notes?", "Got it.")
+    fake = FakeNebius("Hello. What would you like to know?", "Got it.")
     http = stack["start"](fake)
-    turn(http, "Alexa, open Aawiz check-in.")
-    turn(http, "Yes please.")
+    turn(http, "Alexa, hello.")
+    turn(http, "Tell me more.")
     roles = [m["role"] for m in fake.requests[1]["messages"]]
     assert roles == ["system", "user", "assistant", "user"]
 
@@ -218,7 +218,7 @@ def test_when_the_model_asked_first_a_yes_deletes_without_a_second_question(stac
 
 
 def test_a_yes_to_something_else_never_deletes(stack):
-    fake = FakeNebius("May I keep your scores and short notes?", [tool_call("delete_my_data")])
+    fake = FakeNebius([tool_call("delete_my_data")])  # the consent question comes from code
     http = stack["start"](fake)
     turn(http, "Alexa, open Aawiz check-in.")
     data = turn(http, "Yes.")
@@ -254,9 +254,7 @@ def test_the_model_cannot_grant_consent_on_its_own(stack):
 def test_what_the_person_said_decides_the_consent_not_the_model(stack, answer, scores, notes):
     stack["store"].delete_user("user_a")
     everything = {"scores": True, "notes": True}  # the model always asks for everything
-    fake = FakeNebius(
-        "May I keep your scores and short notes?", [tool_call("set_consent", everything)], "Okay."
-    )
+    fake = FakeNebius([tool_call("set_consent", everything)], "Okay.")
     http = stack["start"](fake)
     turn(http, "Alexa, open Aawiz check-in.")
     turn(http, answer)
@@ -286,3 +284,89 @@ def test_what_counts_as_the_person_giving_consent(said, asked, expected):
     if asked:
         state.history = [{"role": "assistant", "content": "May I keep your scores and notes?"}]
     assert _consent_said(said, state) == expected
+
+
+# --- the scores of a check-in come from the person, never from the model ---------
+
+
+def last_checkin(store):
+    return store.checkins("user_a")[-1]
+
+
+def test_a_model_that_logs_a_message_without_numbers_stores_nothing(stack):
+    # Seen live: after "Yes, you can keep my scores and notes." the model called set_consent
+    # and log_checkin with scores it made up, and the check-in was stored.
+    invented = {"mood": 3, "energy": 3, "stress": 3}
+    fake = FakeNebius(
+        [
+            tool_call("set_consent", {"scores": True, "notes": True}),
+            tool_call("log_checkin", invented),
+        ],
+        "Thanks. What are your mood, energy and stress today, each from 1 to 5?",
+    )
+    http = stack["start"](fake)
+    turn(http, "Hi, I'd like to do my check-in.")
+    data = turn(http, "Yes, you can keep my scores and notes.")
+    assert stack["store"].count("user_a") == stack["seeded"]  # nothing new was stored
+    assert [t["tool"] for t in data["tools"]] == ["set_consent"]  # log_checkin never ran
+    refused = json.loads(fake.requests[1]["messages"][-1]["content"])
+    assert refused["stored"] is False and "no mood or energy or stress" in refused["error"]
+    assert "mood, energy and stress" in data["reply"]
+
+
+def test_model_scores_are_replaced_by_what_the_person_said(stack):
+    wrong = {"mood": 5, "energy": 5, "stress": 1, "sleep_hours": 9, "note": "feeling great"}
+    fake = FakeNebius([tool_call("log_checkin", wrong)], "Saved.")
+    http = stack["start"](fake)
+    turn(http, "My mood is 2, energy 3 and stress 4, I slept 6 hours.")
+    row = last_checkin(stack["store"])
+    assert (row.mood, row.energy, row.stress, row.sleep_hours) == (2, 3, 4, 6)
+    assert row.note is None  # the model's note was not the person's words
+
+
+def test_one_missing_score_means_nothing_is_stored(stack):
+    args = {"mood": 2, "energy": 3, "stress": 3}
+    fake = FakeNebius([tool_call("log_checkin", args)], "And your stress, from 1 to 5?")
+    http = stack["start"](fake)
+    turn(http, "My mood is 2 and my energy is 3.")
+    assert stack["store"].count("user_a") == stack["seeded"]
+    assert "no stress" in fake.requests[1]["messages"][-1]["content"]
+
+
+def test_three_bare_numbers_count_only_as_the_answer_to_the_scores_question(stack):
+    args = {"mood": 1, "energy": 1, "stress": 1}
+    fake = FakeNebius(
+        "How are your mood, energy and stress today, each from 1 to 5?",
+        [tool_call("log_checkin", args)],
+        "Saved.",
+        [tool_call("log_checkin", args)],
+        "Tell me your mood, energy and stress.",
+    )
+    http = stack["start"](fake)
+    turn(http, "Hello there.")
+    turn(http, "4, 2 and 5.")
+    row = last_checkin(stack["store"])
+    assert (row.mood, row.energy, row.stress) == (4, 2, 5)
+    turn(http, "I walked 3 km 2 times in 4 days.")  # numbers, but nobody asked for scores
+    assert stack["store"].count("user_a") == stack["seeded"] + 1
+
+
+def test_the_first_check_in_turn_asks_for_consent_before_scores(stack):
+    stack["store"].delete_user("user_a")  # a new person: no consent yet
+    fake = FakeNebius("should not be used")
+    http = stack["start"](fake)
+    data = turn(http, "Hi, I'd like to do my check-in.")
+    assert "may I store your daily scores and short notes" in data["reply"]
+    assert "mood" not in data["reply"]  # consent first, scores after
+    assert fake.requests == [] and data["tools"] == []
+    assert data["brain"] == NEBIUS_LABEL
+
+
+def test_scores_in_the_first_message_go_to_the_tool_which_checks_consent(stack):
+    stack["store"].delete_user("user_a")
+    args = {"mood": 2, "energy": 3, "stress": 4}
+    fake = FakeNebius([tool_call("log_checkin", args)], "May I keep your scores first?")
+    http = stack["start"](fake)
+    data = turn(http, "I want to check in: mood 2, energy 3, stress 4.")
+    assert [t["tool"] for t in data["tools"]] == ["log_checkin"]
+    assert stack["store"].count("user_a") == 0  # the server refused: no consent

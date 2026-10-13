@@ -62,7 +62,10 @@ Crisis language is caught before any request to Nebius; tests assert zero reques
 model's reply passes the banned-word guard, and a reply that fails it is replaced by the
 scripted brain's answer. Consent and deletion are enforced in code: the model cannot grant
 consent for the person, and `delete_my_data` runs only after the person says yes to a delete
-question. Tool calls are limited to four per turn.
+question. The scores of a check-in are also the person's: `log_checkin` runs only with the
+mood, energy and stress read from the person's current message, and the model's own numbers
+are never used. If one is missing, nothing is stored and the model asks. A person who asks to
+check in is asked for consent first. Tool calls are limited to four per turn.
 
 ## LLM mode
 
