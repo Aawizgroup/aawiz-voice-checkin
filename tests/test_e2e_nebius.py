@@ -47,6 +47,8 @@ def test_demo_page_shows_the_brain_labels_and_the_notice(tmp_path):
             browser = p.chromium.launch()
             page = browser.new_page()
             page.goto(f"http://127.0.0.1:{sim_port}")
+            assert page.title() == "Aawiz: a private personal AI for daily check-ins"
+            assert "Alexa" not in page.inner_text("body")
             page.wait_for_selector(f"#brain-badge:has-text('Brain: Nebius · {MODEL}')")
             assert page.inner_text("#demo-notice") == DEMO_NOTICE
             assert page.is_visible("#demo-notice")

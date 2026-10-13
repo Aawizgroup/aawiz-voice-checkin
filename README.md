@@ -48,6 +48,12 @@ eight-turn conversation through each: Lightning called the right tool on every t
 7 seconds for the whole conversation; Nano needed about 58 seconds. So we chose
 `nvidia/Nemotron-3_5-Lightning`.
 
+**Model license.** `nvidia/Nemotron-3_5-Lightning` is released under the OpenMDW-1.1 license
+([NVIDIA NGC model card](https://catalog.ngc.nvidia.com/orgs/nim/nvidia/models/nemotron-3.5-lightning/-/model-card/safety-and-security):
+"Use of this model is governed by the OpenMDW License Agreement, version 1.1").
+
+First request after a quiet period may take a few seconds.
+
 **Run it.**
 
 ```bash

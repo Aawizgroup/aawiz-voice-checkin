@@ -214,3 +214,18 @@ def _demo_users(store: Store) -> list[str]:
     with store._conn() as c:
         rows = c.execute("SELECT DISTINCT user_id FROM consent WHERE user_id LIKE 'demo%'")
         return [r[0] for r in rows.fetchall()]
+
+
+def test_the_demo_page_has_the_personal_ai_title_and_no_alexa_wording(demo_stack):
+    http = demo_stack["start"](FakeNebius())
+    html = http.get("/").text
+    assert "<title>Aawiz: a private personal AI for daily check-ins</title>" in html
+    assert "<h1>Aawiz: a private personal AI for daily check-ins</h1>" in html
+    assert "alexa" not in html.lower()
+
+
+def test_outside_demo_mode_the_page_keeps_its_alexa_wording(tmp_path):
+    from simulator.app import STATIC
+
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "<title>Aawiz Voice Check-in: Alexa+ simulator</title>" in html
