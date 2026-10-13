@@ -18,7 +18,7 @@ from starlette.staticfiles import StaticFiles
 from server.config import env_flag, load_dotenv
 from simulator.brain import ScriptedBrain, SessionState
 from simulator.bridge import McpBridge
-from simulator.limits import LIMIT_NOTE, DemoLimiter
+from simulator.limits import LIMIT_NOTE, VOICE_CHARS_PER_DAY, DemoLimiter, VoiceBudget
 from simulator.tts import ElevenLabsTTS, from_env
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -28,6 +28,7 @@ MAX_PENDING_AUDIO = 200
 MIN_DEMO_SESSION_ID = 16
 _FROM_ENV = object()
 DEMO_NOTICE = "Public demo with synthetic data. Please do not enter real personal information."
+DEMO_VOICE_NOTICE = "Replies are spoken by ElevenLabs (United States), so reply text is sent there."
 DEMO_TITLE = "Aawiz: a private personal AI for daily check-ins"
 # The public demo is not an Alexa+ simulator: the same page, without the Alexa+ wording.
 DEMO_PAGE_TEXT = (
@@ -103,6 +104,7 @@ def create_sim_app(
     nebius_client=None,
     nebius_model: str | None = None,
     limiter: DemoLimiter | None = None,
+    voice_budget: VoiceBudget | None = None,
 ) -> Starlette:
     load_dotenv()
     mcp_url = mcp_url or os.environ.get("MCP_URL", "http://127.0.0.1:8000/mcp")
@@ -116,9 +118,12 @@ def create_sim_app(
         nebius_model = os.environ.get("NEBIUS_MODEL", "").strip()
     if tts is _FROM_ENV:
         tts = from_env()
-    if demo:  # the hosted demo: local backend, browser speech, per-visitor synthetic users
-        backend, tts = "local", None
+    if demo:  # the hosted demo: local backend, per-visitor synthetic users, capped costs
+        backend = "local"
         limiter = limiter or DemoLimiter()
+        if tts and voice_budget is None:  # Elin's voice only when the host gave a key
+            chars = os.environ.get("DEMO_VOICE_CHARS_PER_DAY", "").strip()
+            voice_budget = VoiceBudget(int(chars) if chars.isdigit() else VOICE_CHARS_PER_DAY)
     if nebius_client is None and mode == "nebius" and os.environ.get("NEBIUS_API_KEY", "").strip():
         try:  # one client (one connection pool) shared by every visitor's brain
             from simulator.brain_nebius import make_client
@@ -163,7 +168,7 @@ def create_sim_app(
         if brain.mode == "nebius":
             body["label"] = brain.label
         if demo:
-            body["demo"] = DEMO_NOTICE
+            body["demo"] = f"{DEMO_NOTICE} {DEMO_VOICE_NOTICE}" if tts else DEMO_NOTICE
             body["mcp_url"] = "in-container MCP server"
         return JSONResponse(body)
 
@@ -214,7 +219,7 @@ def create_sim_app(
             body["brain"] = result.brain
         if limited:
             body["note"] = LIMIT_NOTE
-        if tts:
+        if tts and (voice_budget is None or voice_budget.allow(len(result.reply))):
             audio_id = secrets.token_urlsafe(12)
             pending_audio[audio_id] = result.reply
             while len(pending_audio) > MAX_PENDING_AUDIO:

@@ -62,7 +62,10 @@ never logged.
   Recent turns of the conversation are sent along so the model has context.
 - **Public demo (`DEMO_PUBLIC=true`):** synthetic data only. Each visitor gets a random
   pseudonym with an invented 14-day history; everything that pseudonym holds is deleted after
-  two hours and nothing survives a restart. No Aawiz account and no ElevenLabs are involved.
+  two hours and nothing survives a restart. No Aawiz account is involved. If the host has set
+  an ElevenLabs key, replies are spoken in Elin's voice: the reply text (which can repeat
+  scores a visitor typed) is sent to ElevenLabs in the United States, up to a daily character
+  budget; above it, and without a key, the browser's own voice is used. The page says so.
   The page asks visitors not to enter real personal information.
 - **Elin's voice (optional):** the assistant's reply text, and nothing else, is sent to
   ElevenLabs in the United States to be spoken. Your words and notes are never sent. On crisis

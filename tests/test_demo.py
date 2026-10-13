@@ -145,7 +145,9 @@ def test_daily_total_cap():
 def demo_stack(demo_server):
     threads = []
 
-    def start(fake: FakeNebius, limiter: DemoLimiter | None = None) -> httpx.Client:
+    def start(
+        fake: FakeNebius, limiter: DemoLimiter | None = None, tts=None, voice_budget=None
+    ) -> httpx.Client:
         port = free_port()
         app = create_sim_app(
             mcp_url=f"{demo_server['url']}/mcp",
@@ -153,7 +155,8 @@ def demo_stack(demo_server):
             mode="nebius",
             region="NL",
             backend="aawiz",  # ignored: the public demo is always local
-            tts=object(),  # ignored: the public demo never uses ElevenLabs
+            tts=tts,  # Elin's voice only when the host configured it
+            voice_budget=voice_budget,
             demo=True,
             nebius_client=fake.client(),
             nebius_model=MODEL,
@@ -229,3 +232,57 @@ def test_outside_demo_mode_the_page_keeps_its_alexa_wording(tmp_path):
 
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     assert "<title>Aawiz Voice Check-in: Alexa+ simulator</title>" in html
+
+
+class FakeTTS:
+    def __init__(self):
+        self.texts: list[str] = []
+
+    def synthesize(self, text: str) -> bytes:
+        self.texts.append(text)
+        return b"ID3fake-mp3"
+
+
+def test_demo_speaks_in_elins_voice_when_the_host_gave_a_key(demo_stack):
+    tts = FakeTTS()
+    http = demo_stack["start"](FakeNebius("Hello there."), tts=tts)
+    config = http.get("/api/config").json()
+    assert config["voice"] == "elin"
+    assert "spoken by ElevenLabs" in config["demo"]  # visitors are told on the page
+    data = say(http, "session-voice-0123456789", "secret words from the visitor").json()
+    assert http.get(data["audio"]).status_code == 200
+    assert tts.texts == ["Hello there."]  # the reply only, never the visitor's words
+
+
+def test_above_the_voice_budget_the_page_gets_no_audio_and_uses_browser_speech(demo_stack):
+    from simulator.limits import VoiceBudget
+
+    tts = FakeTTS()
+    budget = VoiceBudget(chars_per_day=20)
+    http = demo_stack["start"](
+        FakeNebius("Twelve chars", "Twelve chars"), tts=tts, voice_budget=budget
+    )
+    session = "session-budget-0123456789"
+    assert "audio" in say(http, session, "one").json()
+    second = say(http, session, "two").json()
+    assert "audio" not in second and second["reply"] == "Twelve chars"  # captions still there
+
+
+def test_voice_budget_resets_after_a_day():
+    from simulator.limits import VoiceBudget
+
+    clock = Clock()
+    budget = VoiceBudget(chars_per_day=100, clock=clock)
+    assert budget.allow(60) and not budget.allow(60)
+    clock.t += DAY
+    assert budget.allow(60)
+
+
+def test_crisis_in_the_demo_sends_only_the_safety_text_to_the_voice(demo_stack):
+    from server.safety import safety_message
+
+    tts, fake = FakeTTS(), FakeNebius("never used")
+    http = demo_stack["start"](fake, tts=tts)
+    data = say(http, "session-crisis-0123456789", "I want to end my life").json()
+    http.get(data["audio"])
+    assert fake.requests == [] and tts.texts == [safety_message("NL")]

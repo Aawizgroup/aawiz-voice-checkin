@@ -65,7 +65,9 @@ make nebius-smoke     # optional: lists the NVIDIA models, runs two turns, print
 
 **Hosted demo.** The public demo runs with `DEMO_PUBLIC=true`: synthetic data only, a random
 pseudonym per visitor with an invented 14-day history, everything deleted after two hours, at
-most 20 Nebius turns per visitor per hour and 300 per day. It is one container, built from
+most 20 Nebius turns per visitor per hour and 300 per day. If the host sets `ELEVENLABS_API_KEY`,
+replies are spoken in Elin's voice up to a daily budget (`DEMO_VOICE_CHARS_PER_DAY`, default 3000
+characters); above it the browser's voice is used. It is one container, built from
 [`deploy/Dockerfile.demo`](deploy/Dockerfile.demo), that listens on the host's `PORT`; the only
 setting it needs is the secret `NEBIUS_API_KEY`. It runs on a free Render web service in
 Frankfurt: https://aawiz-voice-checkin.onrender.com

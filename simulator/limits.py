@@ -46,3 +46,31 @@ class DemoLimiter:
             for key in [k for k, v in self._visitors.items() if not v]:
                 del self._visitors[key]
         return True
+
+
+VOICE_CHARS_PER_DAY = 3000
+
+
+class VoiceBudget:
+    """How many characters of reply text the public demo may send to ElevenLabs per day.
+
+    Visitors are anonymous and the voice is paid for by the host, so above the budget the page
+    simply uses the browser's own voice.
+    """
+
+    def __init__(
+        self, chars_per_day: int = VOICE_CHARS_PER_DAY, clock: Callable[[], float] = time.time
+    ):
+        self.chars_per_day = chars_per_day
+        self._clock = clock
+        self._spent: deque[tuple[float, int]] = deque()
+
+    def allow(self, chars: int) -> bool:
+        """True (and counted) when a reply of this length still fits in today's budget."""
+        now = self._clock()
+        while self._spent and now - self._spent[0][0] >= DAY:
+            self._spent.popleft()
+        if sum(n for _, n in self._spent) + chars > self.chars_per_day:
+            return False
+        self._spent.append((now, chars))
+        return True

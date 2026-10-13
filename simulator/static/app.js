@@ -21,6 +21,7 @@
   let voiceOn = true;
   let busy = false;
   let player = null; // Elin's voice, when the simulator has it
+  let elinVoice = false; // the simulator offers Elin's voice (it may still skip a turn)
   const voiceBadge = $("#voice-badge");
 
   function setVoiceLabel(name) { voiceBadge.textContent = "Voice: " + name; }
@@ -122,6 +123,7 @@
       if (data.note) status.textContent = data.note;
       const reply = data.reply || "Sorry, could you say that again?";
       addTurn("assistant", reply, data.safety);
+      if (elinVoice) setVoiceLabel(data.audio ? "Elin" : "browser");
       speakReply(reply, data.audio);
     } catch (e) {
       addTurn("assistant", "Sorry, I couldn't reach the simulator.");
@@ -188,7 +190,8 @@
     }
     $("#mcp-badge").textContent = "MCP: " + c.mcp_url;
     if (c.note) status.textContent = c.note;
-    setVoiceLabel(c.voice === "elin" ? "Elin" : "browser");
+    elinVoice = c.voice === "elin";
+    setVoiceLabel(elinVoice ? "Elin" : "browser");
   }).catch(() => {});
 
   setState("idle");
