@@ -2,6 +2,9 @@
 
 ## Nebius x NVIDIA: Personal AI
 
+**Live demo: https://aawiz-voice-checkin.onrender.com** (synthetic data only; if it has been
+idle, the first load takes about a minute while the free instance wakes up)
+
 This branch (`feature/nebius-personal-ai`) adds an agent brain that runs on **Nebius Token
 Factory** with an **NVIDIA open model**, `nvidia/Nemotron-3_5-Lightning`.
 
@@ -58,7 +61,8 @@ make nebius-smoke     # optional: lists the NVIDIA models, runs two turns, print
 pseudonym per visitor with an invented 14-day history, everything deleted after two hours, at
 most 20 Nebius turns per visitor per hour and 300 per day. It is one container, built from
 [`deploy/Dockerfile.demo`](deploy/Dockerfile.demo), that listens on the host's `PORT`; the only
-setting it needs is the secret `NEBIUS_API_KEY`. Link: to be added once it is live.
+setting it needs is the secret `NEBIUS_API_KEY`. It runs on a free Render web service in
+Frankfurt: https://aawiz-voice-checkin.onrender.com
 
 The demo is hosted on a free instance that goes to sleep after 15 minutes without visitors. If
 it has been idle, the first load takes about a minute while it wakes up; after that it is fast.
