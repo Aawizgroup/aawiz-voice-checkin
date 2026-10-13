@@ -233,7 +233,8 @@ def create_sim_app(
             return JSONResponse({"error": "not found"}, status_code=404)
         mp3 = await run_in_threadpool(tts.synthesize, text)
         if mp3 is None:  # the page falls back to browser speech
-            return JSONResponse({"error": "voice unavailable"}, status_code=503)
+            reason = getattr(tts, "last_error", "")
+            return JSONResponse({"error": "voice unavailable", "reason": reason}, status_code=503)
         return Response(mp3, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
 
     async def health(_: Request) -> JSONResponse:

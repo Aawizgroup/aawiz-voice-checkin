@@ -146,3 +146,12 @@ def test_ask_elin_through_the_simulator(stack):
     data = turn(http, "Alexa, tell Elin I finished the report today.")
     assert data["reply"] == "Nice. How did it feel to finish it?"
     assert [t["tool"] for t in data["tools"]] == ["ask_elin"]
+
+
+def test_a_refused_call_records_the_status_and_code_but_no_secret():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"detail": {"status": "invalid_api_key", "message": "x"}})
+
+    tts = ElevenLabsTTS("test-key", transport=httpx.MockTransport(handler))
+    assert tts.synthesize("Hello") is None
+    assert tts.last_error == "401 invalid_api_key" and "test-key" not in tts.last_error

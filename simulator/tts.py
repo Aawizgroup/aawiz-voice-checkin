@@ -31,6 +31,7 @@ class ElevenLabsTTS:
     ):
         self.voice_id = voice_id
         self.model_id = model_id
+        self.last_error = ""  # why the last call failed: a status and a code, never a secret
         self._http = httpx.Client(
             base_url=API_BASE,
             timeout=TIMEOUT,
@@ -49,10 +50,13 @@ class ElevenLabsTTS:
                 params={"output_format": OUTPUT_FORMAT},
                 json={"text": text, "model_id": self.model_id},
             )
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            self.last_error = f"network: {type(exc).__name__}"
             return None
         if resp.status_code != 200 or not resp.content:
+            self.last_error = f"{resp.status_code} {_error_code(resp)}".strip()
             return None
+        self.last_error = ""
         return resp.content
 
     def voice_name(self) -> str | None:
@@ -61,6 +65,16 @@ class ElevenLabsTTS:
         except httpx.HTTPError:
             return None
         return resp.json().get("name") if resp.status_code == 200 else None
+
+
+def _error_code(resp: httpx.Response) -> str:
+    """ElevenLabs' short error code (for example `invalid_api_key`), or nothing."""
+    try:
+        detail = resp.json().get("detail")
+    except ValueError:
+        return ""
+    code = detail.get("status") if isinstance(detail, dict) else ""
+    return code if isinstance(code, str) else ""
 
 
 def from_env() -> ElevenLabsTTS | None:
